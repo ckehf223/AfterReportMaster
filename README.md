@@ -34,7 +34,7 @@
 
 노션 연동에 두 DB를 연결하고 읽기·수정·추가 권한을 설정합니다. Netlify Blobs는 같은 타임을 동시에 생성하는 것을 막는 데 사용합니다. 저장소에 `package.json`과 `package-lock.json`을 포함하면 Netlify가 배포 때 의존성을 설치합니다.
 
-일별 AI 분석을 쓰려면 같은 내부 연동에 `일별 AI 분석` 페이지도 연결하고 Netlify AI Gateway를 사용할 수 있는지 확인합니다. 제출 후 예약 함수가 약 2분 간격으로 대기 중인 날짜를 처리합니다. 활동자 응답은 같은 타임의 주관자 본문에 링크로 반영되고, 날짜별 AI 분석은 같은 날짜의 페이지 안에서 갱신됩니다. AI Gateway에는 집계 숫자와 사유·건의사항의 분류만 전달합니다. [Netlify AI Gateway](https://docs.netlify.com/build/ai-gateway/overview/)
+일별 분석을 쓰려면 같은 내부 연동에 `일별 AI 분석` 페이지도 연결합니다. 제출 후 예약 함수가 2분 간격으로 대기 중인 날짜를 처리합니다. 활동자 응답은 같은 타임의 주관자 본문에 링크로 반영되고, 일별 집계는 같은 날짜의 페이지에서 갱신됩니다. AI 해석은 Netlify AI Gateway나 운영 환경의 `ANTHROPIC_API_KEY`를 사용합니다. AI 연결을 기다리는 동안 집계와 키워드 분류를 표시합니다. AI에는 집계 숫자와 사유·건의사항의 분류만 전달합니다. [Netlify AI Gateway](https://docs.netlify.com/build/ai-gateway/overview/)
 
 노션 계정이나 워크스페이스를 바꿀 때는 새 워크스페이스에서 내부 연동을 만들고 DB에 연결한 뒤, 이 Netlify 사이트의 환경 변수를 바꾸고 다시 배포하세요. 노션 속성 이름과 유형이 같으면 코드 수정 없이 옮길 수 있습니다. 토큰은 저장소에 올리지 마세요.
 

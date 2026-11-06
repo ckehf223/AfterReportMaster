@@ -95,7 +95,7 @@ async function* childBlocks(notion, page) {
 }
 
 async function analyze(stats, env) {
-  const base = env.ANTHROPIC_BASE_URL.replace(/\/+$/, '');
+  const base = (env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/+$/, '');
   const response = await fetch(`${base}/v1/messages`, {
     method: 'POST',
     headers: {
@@ -188,6 +188,21 @@ function analysisBlock(stats, analysis, sessions, participants) {
   return { type: 'callout', callout: { icon: { type: 'emoji', emoji: '📊' }, rich_text: richText } };
 }
 
+function topicSummary(stats) {
+  const groups = [
+    ['변경·지연·누락 사유', stats.organizerIssues],
+    ['주관자 특이사항', stats.organizerNotes],
+    ['활동자 건의사항', stats.participantSuggestions],
+  ];
+  return [
+    'AI 해석 연결 대기 · 제출 내용의 키워드 분류입니다.',
+    ...groups.map(([label, topics]) => {
+      const summary = Object.entries(topics).map(([topic, count]) => `${topic} ${count}건`).join(' · ');
+      return `${label} · ${summary || '분류된 의견 없음'}`;
+    }),
+  ].join('\n');
+}
+
 export async function updateDailyAnalysis(date, sessionIds, env = process.env) {
   const notion = (path, method = 'GET', body) => notionRequest(path, method, body, env.NOTION_TOKEN);
   const sessions = await notionPages(notion, env.NOTION_SESSIONS_DATA_SOURCE_ID, {
@@ -216,7 +231,6 @@ export async function updateDailyAnalysis(date, sessionIds, env = process.env) {
     }
   }
   if (!env.NOTION_DAILY_ANALYSIS_PAGE_ID) return;
-  if (!env.ANTHROPIC_BASE_URL || !env.ANTHROPIC_API_KEY) throw new Error('Netlify AI Gateway is unavailable');
   const stats = collectDailyStats(sessions, uniqueParticipants);
 
   const parent = env.NOTION_DAILY_ANALYSIS_PAGE_ID;
@@ -226,8 +240,21 @@ export async function updateDailyAnalysis(date, sessionIds, env = process.env) {
   }
   if (matching.length > 1) throw new Error('Multiple daily pages have the same date');
 
-  const result = analysisBlock(stats, await analyze(stats, env), sessions, uniqueParticipants);
-  const [page] = matching;
+  let aiError;
+  let analysis = topicSummary(stats);
+  if (env.ANTHROPIC_API_KEY) {
+    try {
+      analysis = await analyze(stats, env);
+    } catch (error) {
+      aiError = error;
+    }
+  }
+  await saveDateAnalysis(notion, parent, date, matching[0], analysisBlock(stats, analysis, sessions, uniqueParticipants));
+  if (aiError) throw aiError;
+  return { waitingForAI: !env.ANTHROPIC_API_KEY };
+}
+
+async function saveDateAnalysis(notion, parent, date, page, result) {
   if (!page) {
     await notion('pages', 'POST', {
       parent: { type: 'page_id', page_id: parent },
@@ -262,12 +289,17 @@ export async function refreshQueuedDay() {
       const retryKey = `retry/${date}`;
       const retry = await queue.get(retryKey, { type: 'json' });
       const revision = createHash('sha256').update(entries.map(({ key }) => key).sort().join('\n')).digest('hex');
-      if (retry?.revision === revision && retry.after > Date.now()) continue;
+      if (retry?.revision === revision &&
+          (retry.after > Date.now() || (retry.waitingForAI && !process.env.ANTHROPIC_API_KEY))) continue;
       try {
         const sessionIds = new Set(entries.map(({ key }) => key.split('/')[2]));
-        await updateDailyAnalysis(date, sessionIds);
-        await Promise.all(entries.map(({ key }) => queue.delete(key)));
-        if (retry) await queue.delete(retryKey);
+        const result = await updateDailyAnalysis(date, sessionIds);
+        if (result?.waitingForAI) {
+          await queue.setJSON(retryKey, { revision, waitingForAI: true });
+        } else {
+          await Promise.all(entries.map(({ key }) => queue.delete(key)));
+          if (retry) await queue.delete(retryKey);
+        }
       } catch (error) {
         console.error('Daily analysis failed', date, error.message);
         const attempts = (retry?.attempts ?? 0) + 1;
