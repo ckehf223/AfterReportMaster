@@ -30,11 +30,12 @@
 | `NOTION_TOKEN` | 노션 내부 연동 토큰 |
 | `NOTION_SESSIONS_DATA_SOURCE_ID` | 두 폼이 공유하는 `타임별 사후 보고` 데이터 소스 ID |
 | `NOTION_PARTICIPANTS_DATA_SOURCE_ID` | `사후 작성 내역`의 활동자 응답 데이터 소스 ID |
-| `NOTION_DAILY_ANALYSIS_PAGE_ID` | `일별 AI 분석` 상위 페이지 ID. 운영 환경에 지정하면 일별 AI 갱신 시작 |
+| `NOTION_DAILY_ANALYSIS_PAGE_ID` | `일별 AI 분석` 상위 페이지 ID. 운영 환경에 지정하면 날짜별 집계 시작 |
+| `DAILY_AI_ENABLED` | 기본 비활성화. `true`로 설정하면 AI 해석 사용 |
 
 노션 연동에 두 DB를 연결하고 읽기·수정·추가 권한을 설정합니다. Netlify Blobs는 같은 타임을 동시에 생성하는 것을 막는 데 사용합니다. 저장소에 `package.json`과 `package-lock.json`을 포함하면 Netlify가 배포 때 의존성을 설치합니다.
 
-일별 분석을 쓰려면 같은 내부 연동에 `일별 AI 분석` 페이지도 연결합니다. 제출 후 예약 함수가 2분 간격으로 대기 중인 날짜를 처리합니다. 활동자 응답은 같은 타임의 주관자 본문에 링크로 반영되고, 일별 집계는 같은 날짜의 페이지에서 갱신됩니다. AI 해석은 Netlify AI Gateway나 운영 환경의 `ANTHROPIC_API_KEY`를 사용합니다. AI 연결을 기다리는 동안 집계와 키워드 분류를 표시합니다. AI에는 집계 숫자와 사유·건의사항의 분류만 전달합니다. [Netlify AI Gateway](https://docs.netlify.com/build/ai-gateway/overview/)
+일별 집계를 쓰려면 같은 내부 연동에 `일별 AI 분석` 페이지도 연결합니다. 제출 후 예약 함수가 2분 간격으로 대기 중인 날짜를 처리합니다. 활동자 응답은 같은 타임의 주관자 본문에 링크로 반영되고, 일별 집계와 키워드 분류는 같은 날짜의 페이지에서 갱신됩니다. AI 해석을 켠 경우에는 Netlify AI Gateway나 운영 환경의 `ANTHROPIC_API_KEY`를 사용하고, AI에 집계 숫자와 주제 분류를 전달합니다. [Netlify AI Gateway](https://docs.netlify.com/build/ai-gateway/overview/)
 
 노션 계정이나 워크스페이스를 바꿀 때는 새 워크스페이스에서 내부 연동을 만들고 DB에 연결한 뒤, 이 Netlify 사이트의 환경 변수를 바꾸고 다시 배포하세요. 노션 속성 이름과 유형이 같으면 코드 수정 없이 옮길 수 있습니다. 토큰은 저장소에 올리지 마세요.
 

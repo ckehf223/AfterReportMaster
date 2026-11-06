@@ -179,7 +179,7 @@ function analysisBlock(stats, analysis, sessions, participants) {
     ...sessions.map(page => [page, '타임']),
     ...participants.map(page => [page, '활동자 응답']),
   ];
-  const richText = [text('자동 일별 분석', MARKER), text(`\n\n${totals.join('\n')}\n\n`), text(analysis), text('\n\n원본 ')];
+  const richText = [text('자동 일별 집계', MARKER), text(`\n\n${totals.join('\n')}\n\n`), text(analysis), text('\n\n원본 ')];
   sources.slice(0, 35).forEach(([page, label], i) => {
     if (i) richText.push(text(' · '));
     richText.push(text(`${label} ${i + 1}`, page.url));
@@ -188,14 +188,14 @@ function analysisBlock(stats, analysis, sessions, participants) {
   return { type: 'callout', callout: { icon: { type: 'emoji', emoji: '📊' }, rich_text: richText } };
 }
 
-function topicSummary(stats) {
+function topicSummary(stats, aiEnabled) {
   const groups = [
     ['변경·지연·누락 사유', stats.organizerIssues],
     ['주관자 특이사항', stats.organizerNotes],
     ['활동자 건의사항', stats.participantSuggestions],
   ];
   return [
-    'AI 해석 연결 대기 · 제출 내용의 키워드 분류입니다.',
+    aiEnabled ? 'AI 해석 연결 대기 · 제출 내용의 키워드 분류입니다.' : '제출 내용의 키워드 분류',
     ...groups.map(([label, topics]) => {
       const summary = Object.entries(topics).map(([topic, count]) => `${topic} ${count}건`).join(' · ');
       return `${label} · ${summary || '분류된 의견 없음'}`;
@@ -240,9 +240,10 @@ export async function updateDailyAnalysis(date, sessionIds, env = process.env) {
   }
   if (matching.length > 1) throw new Error('Multiple daily pages have the same date');
 
+  const aiEnabled = env.DAILY_AI_ENABLED === 'true';
   let aiError;
-  let analysis = topicSummary(stats);
-  if (env.ANTHROPIC_API_KEY) {
+  let analysis = topicSummary(stats, aiEnabled);
+  if (aiEnabled && env.ANTHROPIC_API_KEY) {
     try {
       analysis = await analyze(stats, env);
     } catch (error) {
@@ -251,7 +252,7 @@ export async function updateDailyAnalysis(date, sessionIds, env = process.env) {
   }
   await saveDateAnalysis(notion, parent, date, matching[0], analysisBlock(stats, analysis, sessions, uniqueParticipants));
   if (aiError) throw aiError;
-  return { waitingForAI: !env.ANTHROPIC_API_KEY };
+  return { waitingForAI: aiEnabled && !env.ANTHROPIC_API_KEY };
 }
 
 async function saveDateAnalysis(notion, parent, date, page, result) {
@@ -289,8 +290,9 @@ export async function refreshQueuedDay() {
       const retryKey = `retry/${date}`;
       const retry = await queue.get(retryKey, { type: 'json' });
       const revision = createHash('sha256').update(entries.map(({ key }) => key).sort().join('\n')).digest('hex');
+      const aiEnabled = process.env.DAILY_AI_ENABLED === 'true';
       if (retry?.revision === revision &&
-          (retry.after > Date.now() || (retry.waitingForAI && !process.env.ANTHROPIC_API_KEY))) continue;
+          (retry.after > Date.now() || (retry.waitingForAI && aiEnabled && !process.env.ANTHROPIC_API_KEY))) continue;
       try {
         const sessionIds = new Set(entries.map(({ key }) => key.split('/')[2]));
         const result = await updateDailyAnalysis(date, sessionIds);
