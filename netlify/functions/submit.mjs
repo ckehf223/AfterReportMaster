@@ -5,7 +5,13 @@ import { getStore } from '@netlify/blobs';
 const NOTION_VERSION = '2026-03-11';
 const SLOTS = new Set(['1타임', '2타임', '3타임', '4타임', '그 외']);
 const SCORE_PROPERTIES = ['활동 이해', '안내 준수', '활동 범위 확인', '찾기 기록'];
-const ORGANIZER_BODY_TITLE = '주관자 사후 내용';
+const SCORE_QUESTIONS = [
+  '활동을 시작하기 전에 오늘 할 일을 이해했다.',
+  '안내받은 순서에 따라 활동했다.',
+  '맡은 활동 범위를 끝까지 확인했다.',
+  '찾은 내용을 빠짐없이 기록했다.',
+];
+const ORGANIZER_BODY_MARKER = 'https://havefunsam.netlify.app/#generated-organizer-report';
 const SESSION_RESERVATION_MS = 90_000;
 const SESSION_WAIT_MS = 15_000;
 
@@ -35,13 +41,54 @@ function richText(value) {
   return { rich_text: value ? [{ text: { content: value } }] : [] };
 }
 
-function reportCallout(title, fields) {
-  const label = content => ({ type: 'text', text: { content }, annotations: { bold: true } });
-  const rich_text = [label(title)];
-  for (const [name, value] of fields) {
-    rich_text.push(label(`\n\n${name}\n`), { type: 'text', text: { content: value } });
-  }
-  return { type: 'callout', callout: { icon: { type: 'emoji', emoji: '📝' }, rich_text } };
+function block(type, value, options) {
+  return { type, [type]: { ...richText(value), ...options } };
+}
+
+function reportDetails(date, slot, role, name, results) {
+  const bullet = value => block('bulleted_list_item', value);
+  return [
+    block('heading_2', '상세내역'),
+    { type: 'divider', divider: {} },
+    block('heading_3', '1️⃣ 활동 정보'),
+    bullet(`활동일: ${date}`),
+    bullet(`활동 시간: ${slot}`),
+    bullet(`${role} 이름: ${name}`),
+    block('heading_3', '2️⃣ 활동 결과'),
+    ...results.map(bullet),
+  ];
+}
+
+function organizerDetails(date, slot, name, headcount, findings, changes, notes) {
+  const details = reportDetails(date, slot, '주관자', name, [
+    `활동 인원수: ${headcount}명`, `전체 찾기 건수: ${findings}건`,
+  ]);
+  // Tag only our synced block so resubmissions never replace hand-written page sections.
+  details[0].heading_2.rich_text.push({
+    type: 'text', text: { content: '\u2063', link: { url: ORGANIZER_BODY_MARKER } },
+  });
+  const noteSection = (title, value) => block('heading_3', title, {
+    is_toggleable: true, children: [block('paragraph', value || '없습니다.')],
+  });
+  return [
+    ...details,
+    block('heading_2', '활동 변경 지연/누락 사유'),
+    { type: 'divider', divider: {} },
+    noteSection('활동 변경 지연/누락 사유', changes),
+    noteSection('특이사항', notes),
+    block('heading_2', '활동자 사후내역'),
+  ];
+}
+
+function participantDetails(date, slot, name, findings, scores, suggestions) {
+  return [
+    ...reportDetails(date, slot, '활동자', name, [`찾기 건수: ${findings}건`]),
+    block('bulleted_list_item', '체크리스트 내역', {
+      children: SCORE_QUESTIONS.map((question, index) =>
+        block('bulleted_list_item', `${question} : ${scores[index]}점`)),
+    }),
+    block('bulleted_list_item', `건의사항: ${suggestions || '없습니다.'}`),
+  ];
 }
 
 function validDate(value) {
@@ -157,21 +204,33 @@ async function saveOrganizerReport(sessionId, properties, body, token) {
     await notionRequest(`pages/${sessionId}`, 'PATCH', { properties }, token);
 
     const childrenPath = `blocks/${sessionId}/children`;
+    const previousReports = [];
     let cursor;
     do {
       const query = new URLSearchParams({ page_size: '100' });
       if (cursor) query.set('start_cursor', cursor);
       const page = await notionRequest(`${childrenPath}?${query}`, 'GET', undefined, token);
-      const existing = page.results.find(block =>
-        block.type === 'callout' && block.callout.rich_text[0]?.plain_text === ORGANIZER_BODY_TITLE);
-      if (existing) {
-        await notionRequest(`blocks/${existing.id}`, 'PATCH', { callout: body.callout }, token);
-        return;
+      for (const child of page.results) {
+        if (child.type === 'callout' && child.callout.rich_text[0]?.plain_text === '주관자 사후 내용') {
+          previousReports.push(child.id);
+        }
+        if (child.type === 'synced_block' && child.synced_block.synced_from === null && child.has_children) {
+          const preview = await notionRequest(`blocks/${child.id}/children?page_size=1`, 'GET', undefined, token);
+          const heading = preview.results[0]?.heading_2;
+          if (heading?.rich_text.some(item => item.href === ORGANIZER_BODY_MARKER)) previousReports.push(child.id);
+        }
       }
       cursor = page.next_cursor;
     } while (cursor);
 
-    await notionRequest(childrenPath, 'PATCH', { children: [body] }, token);
+    const [heading, ...details] = body;
+    const report = await notionRequest(childrenPath, 'PATCH', { children: [{
+      type: 'synced_block', synced_block: { synced_from: null, children: [heading] },
+    }] }, token);
+    await notionRequest(`blocks/${report.results[0].id}/children`, 'PATCH', { children: details }, token);
+    for (const previousId of previousReports) {
+      await notionRequest(`blocks/${previousId}`, 'PATCH', { in_trash: true }, token);
+    }
   } finally {
     await store.setJSON(sessionId, { expiresAt: 0 }, { onlyIfMatch: lease.etag }).catch(() => {});
   }
@@ -235,10 +294,7 @@ export default async function submit(request) {
       '특이사항': richText(notes),
       '주관자 제출 완료': { checkbox: true },
     };
-    const body = reportCallout(ORGANIZER_BODY_TITLE, [
-      ['변경·지연·누락 사유', changes || '기재 없음'],
-      ['특이사항', notes || '기재 없음'],
-    ]);
+    const body = organizerDetails(date, slot, name, headcount, findings, changes, notes);
     saveReport = sessionId => saveOrganizerReport(sessionId, properties, body, token);
   } else {
     const scores = SCORE_PROPERTIES.map((_, index) => count(input[`score${index + 1}`]));
@@ -258,10 +314,7 @@ export default async function submit(request) {
         '건의사항': richText(suggestions),
         ...scoreValues,
       },
-      children: [reportCallout('활동자 사후 내용', [
-        ['체크리스트', SCORE_PROPERTIES.map((property, index) => `${property} ${scores[index]} / 5`).join('\n')],
-        ['건의사항', suggestions || '기재 없음'],
-      ])],
+      children: participantDetails(date, slot, name, findings, scores, suggestions),
     }, token);
   }
 
