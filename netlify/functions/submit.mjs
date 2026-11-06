@@ -64,7 +64,10 @@ async function notionRequest(path, method, body, token) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => null);
-    console.error('Notion request failed', response.status, error?.code);
+    const invalidProperty = error?.message?.match(/^(.+?) is not a property that exists\.?$/)?.[1];
+    const invalidField = error?.message?.match(/\bbody\.[\w.\[\]]+/)?.[0];
+    console.error('Notion request failed', method, path.split('/')[0], response.status, error?.code,
+      invalidProperty || invalidField || '');
     throw Object.assign(new Error('Notion request failed'), { notionStatus: response.status });
   }
   return response.json();
