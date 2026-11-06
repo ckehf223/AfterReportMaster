@@ -1,0 +1,23 @@
+[build]
+  publish = "public"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/public/index.html"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/organizer.html"
+  to = "/"
+  status = 301
+
+[[redirects]]
+  from = "/participant.html"
+  to = "/"
+  status = 301

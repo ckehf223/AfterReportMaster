@@ -1,0 +1,206 @@
+<section id="form" class="panel form-panel" aria-labelledby="form-title">
+  <div class="form-intro">
+    <p class="eyebrow">활동 기록</p>
+    <h1 id="form-title" tabindex="-1">활동자 사후 보고</h1>
+    <p>
+      해당 활동을 선택하고 문장마다 나의 활동에 가장 가까운 점수를 골라 주세요.
+    </p>
+  </div>
+  <form id="report-form" method="post" data-role="participant">
+    <fieldset class="form-section">
+      <legend><span>01</span> 활동 정보</legend>
+      <div class="fields">
+        <div class="date-field">
+          <label for="activity-date"
+            >활동일 <span class="required" aria-hidden="true">*</span></label
+          >
+          <input
+            id="activity-date"
+            type="text"
+            name="date"
+            placeholder="날짜를 선택해 주세요"
+            pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}"
+            maxlength="10"
+            autocomplete="off"
+            inputmode="none"
+            aria-haspopup="dialog"
+            required
+          />
+        </div>
+        <label
+          >활동 시간 <span class="required" aria-hidden="true">*</span>
+          <select name="slot" required>
+            <option value="">타임을 선택해 주세요</option>
+            <option>1타임</option>
+            <option>2타임</option>
+            <option>3타임</option>
+            <option>그 외</option>
+          </select>
+        </label>
+        <label id="other-field" class="full" hidden
+          >추가 회차 코드 <span class="required" aria-hidden="true">*</span>
+          <input
+            name="otherCode"
+            maxlength="40"
+            placeholder="예: 추가-01"
+            aria-describedby="other-help"
+            disabled
+          />
+          <small id="other-help"
+            >‘그 외’ 활동에 안내된 회차 코드를 입력해 주세요.</small
+          >
+        </label>
+        <label class="full"
+          >활동자 성명 <span class="required" aria-hidden="true">*</span
+          ><input
+            name="name"
+            autocomplete="name"
+            maxlength="80"
+            placeholder="성명을 입력해 주세요"
+            required
+        /></label>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>
+        <span>02</span> 활동 체크리스트
+        <span class="required" aria-hidden="true">*</span>
+      </legend>
+      <p class="rating-guide">
+        문장마다 점수를 하나씩 골라 주세요. 1은 ‘전혀 그렇지 않다’, 5는 ‘매우
+        그렇다’예요.
+      </p>
+      <fieldset class="rating-question">
+        <legend>1. 활동을 시작하기 전에 오늘 할 일을 이해했다.</legend>
+        <div class="score-options">
+          <label
+            ><input type="radio" name="score1" value="1" required /><span
+              >1</span
+            ></label
+          >
+          <label
+            ><input type="radio" name="score1" value="2" /><span>2</span></label
+          >
+          <label
+            ><input type="radio" name="score1" value="3" /><span>3</span></label
+          >
+          <label
+            ><input type="radio" name="score1" value="4" /><span>4</span></label
+          >
+          <label
+            ><input type="radio" name="score1" value="5" /><span>5</span></label
+          >
+        </div>
+      </fieldset>
+      <fieldset class="rating-question">
+        <legend>2. 안내받은 순서에 따라 활동했다.</legend>
+        <div class="score-options">
+          <label
+            ><input type="radio" name="score2" value="1" required /><span
+              >1</span
+            ></label
+          >
+          <label
+            ><input type="radio" name="score2" value="2" /><span>2</span></label
+          >
+          <label
+            ><input type="radio" name="score2" value="3" /><span>3</span></label
+          >
+          <label
+            ><input type="radio" name="score2" value="4" /><span>4</span></label
+          >
+          <label
+            ><input type="radio" name="score2" value="5" /><span>5</span></label
+          >
+        </div>
+      </fieldset>
+      <fieldset class="rating-question">
+        <legend>3. 맡은 활동 범위를 끝까지 확인했다.</legend>
+        <div class="score-options">
+          <label
+            ><input type="radio" name="score3" value="1" required /><span
+              >1</span
+            ></label
+          >
+          <label
+            ><input type="radio" name="score3" value="2" /><span>2</span></label
+          >
+          <label
+            ><input type="radio" name="score3" value="3" /><span>3</span></label
+          >
+          <label
+            ><input type="radio" name="score3" value="4" /><span>4</span></label
+          >
+          <label
+            ><input type="radio" name="score3" value="5" /><span>5</span></label
+          >
+        </div>
+      </fieldset>
+      <fieldset class="rating-question">
+        <legend>4. 찾은 내용을 빠짐없이 기록했다.</legend>
+        <div class="score-options">
+          <label
+            ><input type="radio" name="score4" value="1" required /><span
+              >1</span
+            ></label
+          >
+          <label
+            ><input type="radio" name="score4" value="2" /><span>2</span></label
+          >
+          <label
+            ><input type="radio" name="score4" value="3" /><span>3</span></label
+          >
+          <label
+            ><input type="radio" name="score4" value="4" /><span>4</span></label
+          >
+          <label
+            ><input type="radio" name="score4" value="5" /><span>5</span></label
+          >
+        </div>
+      </fieldset>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend><span>03</span> 활동 결과</legend>
+      <div class="fields">
+        <label class="full"
+          >본인 찾기 건수 <span class="required" aria-hidden="true">*</span
+          ><input
+            type="number"
+            name="findings"
+            min="0"
+            step="1"
+            inputmode="numeric"
+            required
+        /></label>
+        <label class="full"
+          >건의사항 <span class="optional">선택</span
+          ><textarea
+            name="suggestions"
+            rows="4"
+            maxlength="1500"
+            placeholder="다음 활동에 반영하면 좋을 내용을 적어주세요."
+          ></textarea>
+        </label>
+      </div>
+    </fieldset>
+
+    <p class="error" id="submit-error" role="alert" hidden></p>
+    <div class="actions">
+      <button type="button" class="button secondary" data-home>처음으로</button
+      ><button class="button primary" type="submit" id="send">
+        사후 보고 제출 <span aria-hidden="true">→</span>
+      </button>
+    </div>
+  </form>
+</section>
+
+<section id="done" class="panel ending" aria-labelledby="done-title" hidden>
+  <div class="check" aria-hidden="true">✓</div>
+  <p class="eyebrow">기록 완료</p>
+  <h1 id="done-title" tabindex="-1">제출이 완료됐어요</h1>
+  <p>오늘의 활동을 기록해 주셔서 감사합니다.</p>
+  <p id="receipt" class="receipt"></p>
+  <button type="button" class="button secondary" data-home>처음으로</button>
+</section>

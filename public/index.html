@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#123c30" />
+    <meta
+      name="description"
+      content="즐기삼 활동을 마치고 남기는 사후 보고입니다."
+    />
+    <title>즐기삼 | 활동 사후</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script defer src="date-picker.js"></script>
+    <script defer src="app.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="site-header">
+        <a href="./index.html" class="brand"
+          ><img src="assets/leaf.png" alt="" width="42" height="22" /> 우리 모두
+          즐기삼</a
+        >
+        <span class="role" id="report-role">활동 기록</span>
+      </header>
+
+      <ol class="steps" aria-label="진행 단계">
+        <li data-step="cover" aria-current="step"><span>01</span> 안내</li>
+        <li data-step="form"><span>02</span> 사후 작성</li>
+        <li data-step="done"><span>03</span> 제출 완료</li>
+      </ol>
+
+      <section id="cover" class="panel cover" aria-labelledby="cover-title">
+        <img
+          class="cover-image"
+          src="assets/cover.png"
+          alt="우리 모두 즐기삼"
+          width="900"
+          height="871"
+          fetchpriority="high"
+        />
+        <div class="cover-copy">
+          <h3 id="cover-title" tabindex="-1">활동 사후 작성</h3>
+          <nav class="role-actions" aria-label="작성할 사후 보고">
+            <button type="button" data-role="organizer" class="button primary"
+              >주관자 사후 <span aria-hidden="true">→</span></button
+            >
+            <button type="button" data-role="participant" class="button secondary"
+              >활동자 사후 <span aria-hidden="true">→</span></button
+            >
+          </nav>
+          <p id="role-status" class="role-status" role="status"></p>
+        </div>
+      </section>
+
+      <div id="report-view" hidden></div>
+
+      <footer>
+        © 2026 <span lang="en">Have Fun, Sam!</span> All rights reserved.
+      </footer>
+    </main>
+  </body>
+</html>
