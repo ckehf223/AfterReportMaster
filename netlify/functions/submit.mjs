@@ -3,8 +3,9 @@ import { setTimeout as wait } from 'node:timers/promises';
 import { getStore } from '@netlify/blobs';
 
 const NOTION_VERSION = '2026-03-11';
-const SLOTS = new Set(['1타임', '2타임', '3타임', '그 외']);
+const SLOTS = new Set(['1타임', '2타임', '3타임', '4타임', '그 외']);
 const SCORE_PROPERTIES = ['활동 이해', '안내 준수', '활동 범위 확인', '찾기 기록'];
+const ORGANIZER_BODY_TITLE = '주관자 사후 내용';
 const SESSION_RESERVATION_MS = 90_000;
 const SESSION_WAIT_MS = 15_000;
 
@@ -32,6 +33,15 @@ function count(value) {
 
 function richText(value) {
   return { rich_text: value ? [{ text: { content: value } }] : [] };
+}
+
+function reportCallout(title, fields) {
+  const label = content => ({ type: 'text', text: { content }, annotations: { bold: true } });
+  const rich_text = [label(title)];
+  for (const [name, value] of fields) {
+    rich_text.push(label(`\n\n${name}\n`), { type: 'text', text: { content: value } });
+  }
+  return { type: 'callout', callout: { icon: { type: 'emoji', emoji: '📝' }, rich_text } };
 }
 
 function validDate(value) {
@@ -130,6 +140,40 @@ async function getOrCreateSession(key, source, token) {
   throw new SessionLookupError(503, '이 타임의 저장을 준비 중이에요. 잠시 후 다시 제출해 주세요.');
 }
 
+async function saveOrganizerReport(sessionId, properties, body, token) {
+  const store = getStore({ name: 'notion-organizer-report', consistency: 'strong' });
+  const entry = await store.getWithMetadata(sessionId, { type: 'json' });
+  const busy = new SessionLookupError(409, '이 타임의 주관자 보고를 저장 중이에요. 잠시 후 다시 제출해 주세요.');
+  if (entry?.data.expiresAt > Date.now()) throw busy;
+
+  const lease = await store.setJSON(sessionId, { expiresAt: Date.now() + SESSION_RESERVATION_MS },
+    entry ? { onlyIfMatch: entry.etag } : { onlyIfNew: true });
+  if (!lease.modified) throw busy;
+
+  try {
+    await notionRequest(`pages/${sessionId}`, 'PATCH', { properties }, token);
+
+    const childrenPath = `blocks/${sessionId}/children`;
+    let cursor;
+    do {
+      const query = new URLSearchParams({ page_size: '100' });
+      if (cursor) query.set('start_cursor', cursor);
+      const page = await notionRequest(`${childrenPath}?${query}`, 'GET', undefined, token);
+      const existing = page.results.find(block =>
+        block.type === 'callout' && block.callout.rich_text[0]?.plain_text === ORGANIZER_BODY_TITLE);
+      if (existing) {
+        await notionRequest(`blocks/${existing.id}`, 'PATCH', { callout: body.callout }, token);
+        return;
+      }
+      cursor = page.next_cursor;
+    } while (cursor);
+
+    await notionRequest(childrenPath, 'PATCH', { children: [body] }, token);
+  } finally {
+    await store.setJSON(sessionId, { expiresAt: 0 }, { onlyIfMatch: lease.etag }).catch(() => {});
+  }
+}
+
 export default async function submit(request) {
   if (request.method !== 'POST') {
     return new Response(null, { status: 405, headers: { Allow: 'POST' } });
@@ -178,16 +222,21 @@ export default async function submit(request) {
   if (organizer) {
     const headcount = count(input.headcount);
     if (headcount === null) return reply(400, { error: '활동 인원 수를 확인해 주세요.' });
-    saveReport = sessionId => notionRequest(`pages/${sessionId}`, 'PATCH', {
-      properties: {
-        '주관자 이름': richText(name),
-        '실제 참여 인원': { number: headcount },
-        '전체 찾기 건수': { number: findings },
-        '변경·지연·누락 사유': richText(text(input.changes, 1500)),
-        '특이사항': richText(text(input.notes, 1500)),
-        '주관자 제출 완료': { checkbox: true },
-      },
-    }, token);
+    const changes = text(input.changes, 1500);
+    const notes = text(input.notes, 1500);
+    const properties = {
+      '주관자 이름': richText(name),
+      '실제 참여 인원': { number: headcount },
+      '전체 찾기 건수': { number: findings },
+      '변경·지연·누락 사유': richText(changes),
+      '특이사항': richText(notes),
+      '주관자 제출 완료': { checkbox: true },
+    };
+    const body = reportCallout(ORGANIZER_BODY_TITLE, [
+      ['변경·지연·누락 사유', changes || '기재 없음'],
+      ['특이사항', notes || '기재 없음'],
+    ]);
+    saveReport = sessionId => saveOrganizerReport(sessionId, properties, body, token);
   } else {
     const scores = SCORE_PROPERTIES.map((_, index) => count(input[`score${index + 1}`]));
     if (scores.some(score => score === null || score < 1 || score > 5)) {
@@ -196,15 +245,20 @@ export default async function submit(request) {
     const scoreValues = Object.fromEntries(
       SCORE_PROPERTIES.map((property, index) => [property, { number: scores[index] }]),
     );
+    const suggestions = text(input.suggestions, 1500);
     saveReport = sessionId => notionRequest('pages', 'POST', {
       parent: { type: 'data_source_id', data_source_id: participantsSource },
       properties: {
         '응답명': { title: [{ text: { content: name } }] },
         '타임': { relation: [{ id: sessionId }] },
         '본인 찾기 건수': { number: findings },
-        '건의사항': richText(text(input.suggestions, 1500)),
+        '건의사항': richText(suggestions),
         ...scoreValues,
       },
+      children: [reportCallout('활동자 사후 내용', [
+        ['체크리스트', SCORE_PROPERTIES.map((property, index) => `${property} ${scores[index]} / 5`).join('\n')],
+        ['건의사항', suggestions || '기재 없음'],
+      ])],
     }, token);
   }
 
