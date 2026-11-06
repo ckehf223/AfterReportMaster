@@ -11,9 +11,11 @@
 | `public/forms/participant.html` | 활동자 폼, 체크리스트와 완료 화면 |
 | `public/styles.css` | 색상, 여백, 모바일 레이아웃 |
 | `public/assets/cover.png` | 커버 이미지 |
+| `public/assets/favicon.svg` | 브라우저 탭의 잎사귀 아이콘 |
 | `public/app.js` | 화면 전환과 제출 상태 |
 | `public/date-picker.js` | 활동일 입력칸과 달력 동작 |
 | `netlify/functions/submit.mjs` | 타임 조회와 노션 속성 매핑 |
+| `netlify/lib/daily-analysis.mjs` | 활동자 링크와 일별 AI 분석 갱신 |
 
 질문 문구만 바꿀 때는 HTML을 수정하면 됩니다. 체크리스트 문장을 추가하거나 빼는 경우 HTML의 점수 그룹 이름(`score1` 등), 함수의 `SCORE_PROPERTIES`, 노션 숫자 속성을 함께 맞춥니다. 타임 선택지를 바꾸면 두 폼과 함수의 `SLOTS`를 함께 수정합니다.
 
@@ -27,9 +29,12 @@
 | --- | --- |
 | `NOTION_TOKEN` | 노션 내부 연동 토큰 |
 | `NOTION_SESSIONS_DATA_SOURCE_ID` | 두 폼이 공유하는 `타임별 사후 보고` 데이터 소스 ID |
-| `NOTION_PARTICIPANTS_DATA_SOURCE_ID` | `참여자 응답` 데이터 소스 ID |
+| `NOTION_PARTICIPANTS_DATA_SOURCE_ID` | `사후 작성 내역`의 활동자 응답 데이터 소스 ID |
+| `NOTION_DAILY_ANALYSIS_PAGE_ID` | `일별 AI 분석` 상위 페이지 ID. 운영 환경에 지정하면 일별 AI 갱신 시작 |
 
 노션 연동에 두 DB를 연결하고 읽기·수정·추가 권한을 설정합니다. Netlify Blobs는 같은 타임을 동시에 생성하는 것을 막는 데 사용합니다. 저장소에 `package.json`과 `package-lock.json`을 포함하면 Netlify가 배포 때 의존성을 설치합니다.
+
+일별 AI 분석을 쓰려면 같은 내부 연동에 `일별 AI 분석` 페이지도 연결하고 Netlify AI Gateway를 사용할 수 있는지 확인합니다. 제출 후 예약 함수가 약 2분 간격으로 대기 중인 날짜를 처리합니다. 활동자 응답은 같은 타임의 주관자 본문에 링크로 반영되고, 날짜별 AI 분석은 같은 날짜의 페이지 안에서 갱신됩니다. AI Gateway에는 집계 숫자와 사유·건의사항의 분류만 전달합니다. [Netlify AI Gateway](https://docs.netlify.com/build/ai-gateway/overview/)
 
 노션 계정이나 워크스페이스를 바꿀 때는 새 워크스페이스에서 내부 연동을 만들고 DB에 연결한 뒤, 이 Netlify 사이트의 환경 변수를 바꾸고 다시 배포하세요. 노션 속성 이름과 유형이 같으면 코드 수정 없이 옮길 수 있습니다. 토큰은 저장소에 올리지 마세요.
 
@@ -52,7 +57,7 @@
 
 | 속성 | 유형 |
 | --- | --- |
-| `응답명` | 제목. 활동자 성명으로 채움 |
+| `활동자 이름` | 제목. 활동자 성명으로 채움 |
 | `타임` | `타임별 사후 보고`를 가리키는 관계형. 타임 DB에도 표시를 켜면 연결된 응답을 볼 수 있음 |
 | `활동 이해` | 숫자 |
 | `안내 준수` | 숫자 |

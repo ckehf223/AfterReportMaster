@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as wait } from 'node:timers/promises';
 import { getStore } from '@netlify/blobs';
+import { organizerResponses, ORGANIZER_BODY_MARKER, queueDailyAnalysis } from '../lib/daily-analysis.mjs';
+import { notionRequest } from '../lib/notion.mjs';
 
-const NOTION_VERSION = '2026-03-11';
 const SLOTS = new Set(['1타임', '2타임', '3타임', '4타임', '그 외']);
 const SCORE_PROPERTIES = ['활동 이해', '안내 준수', '활동 범위 확인', '찾기 기록'];
 const SCORE_QUESTIONS = [
@@ -11,7 +12,6 @@ const SCORE_QUESTIONS = [
   '맡은 활동 범위를 끝까지 확인했다.',
   '찾은 내용을 빠짐없이 기록했다.',
 ];
-const ORGANIZER_BODY_MARKER = 'https://havefunsam.netlify.app/#generated-organizer-report';
 const SESSION_RESERVATION_MS = 90_000;
 const SESSION_WAIT_MS = 15_000;
 
@@ -77,6 +77,7 @@ function organizerDetails(date, slot, name, headcount, findings, changes, notes)
     noteSection('활동 변경 지연/누락 사유', changes),
     noteSection('특이사항', notes),
     block('heading_2', '활동자 사후내역'),
+    organizerResponses([]),
   ];
 }
 
@@ -95,29 +96,6 @@ function validDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(value);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
-}
-
-async function notionRequest(path, method, body, token) {
-  const response = await fetch(`https://api.notion.com/v1/${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Notion-Version': NOTION_VERSION,
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(10000),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-    const invalidProperty = error?.message?.match(/^(.+?) is not a property that exists\.?$/)?.[1];
-    const invalidField = error?.message?.match(/\bbody\.[\w.\[\]]+/)?.[0];
-    console.error('Notion request failed', method, path.split('/')[0], response.status, error?.code,
-      invalidProperty || invalidField || '');
-    throw Object.assign(new Error('Notion request failed'), { notionStatus: response.status });
-  }
-  return response.json();
 }
 
 async function findSession(key, source, token) {
@@ -322,6 +300,7 @@ export default async function submit(request) {
   try {
     const sessionId = await getOrCreateSession(key, sessionsSource, token);
     await saveReport(sessionId);
+    await queueDailyAnalysis(date, sessionId).catch(() => console.error('Could not queue daily analysis'));
     return reply(200, { ok: true });
   } catch (error) {
     if (error instanceof SessionLookupError) return reply(error.status, { error: error.message });
