@@ -121,22 +121,26 @@ async function analyze(stats, env) {
 const text = (content, url) => ({ type: 'text', text: { content, ...(url && { link: { url } }) } });
 
 export function organizerResponses(participants) {
-  const responseLinks = participants.slice(0, 40).map(page => {
+  const heading = participants.length ? `활동자 응답 ${participants.length}건` : '연결된 활동자 응답이 아직 없습니다.';
+  const groups = [[text('\u2063', RESPONSES_MARKER), text(heading)]];
+  for (const [index, page] of participants.entries()) {
+    if (index > 0 && index % 40 === 0) groups.push([text('\u2063', RESPONSES_MARKER)]);
     const title = Object.values(page.properties).find(property => property.type === 'title');
     const name = title?.title.map(item => item.plain_text).join('') || '활동자 응답';
-    return text(`\n• ${name.slice(0, 160)}`, page.url);
-  });
-  if (participants.length > 40) responseLinks.push(text('\n나머지 응답은 위 활동자 요약에서 열 수 있습니다.'));
-  return {
-    type: 'paragraph',
-    paragraph: {
-      rich_text: [
-        text('\u2063', RESPONSES_MARKER),
-        text(participants.length ? `활동자 응답 ${participants.length}건` : '연결된 활동자 응답이 아직 없습니다.'),
-        ...responseLinks,
-      ],
-    },
-  };
+    const findings = number(page, '본인 찾기 건수');
+    const scores = QUESTIONS.map(question => {
+      const score = number(page, question);
+      return `${question} ${score >= 1 && score <= 5 ? `${score}/5` : '미응답'}`;
+    }).join(' · ');
+    const suggestions = plain(page, '건의사항').trim().slice(0, 1500) || '없음';
+    const details = [
+      `본인 찾기 ${findings === null ? '미입력' : `${findings}건`}`,
+      `체크리스트 · ${scores}`,
+      `건의사항 · ${suggestions}`,
+    ].join('\n');
+    groups.at(-1).push(text(`\n\n• ${name.slice(0, 160)}`, page.url), text(`\n${details}`));
+  }
+  return groups.map(richText => ({ type: 'paragraph', paragraph: { rich_text: richText } }));
 }
 
 async function updateOrganizerResponses(notion, session, participants) {
@@ -151,16 +155,28 @@ async function updateOrganizerResponses(notion, session, participants) {
     const blocks = [];
     for await (const block of childBlocks(notion, wrapperId)) blocks.push(block);
     if (!blocks[0]?.heading_2?.rich_text.some(item => item.href === ORGANIZER_BODY_MARKER)) continue;
-    const existing = blocks.find(block => block.paragraph?.rich_text[0]?.href === RESPONSES_MARKER);
+    const existing = blocks.filter(block => block.paragraph?.rich_text[0]?.href === RESPONSES_MARKER);
     const updated = organizerResponses(participants);
-    if (existing) {
-      const displayed = existing.paragraph.rich_text.map(item => [item.plain_text, item.href ?? null]);
-      const next = updated.paragraph.rich_text.map(item => [item.text.content, item.text.link?.url ?? null]);
+    for (const [index, { paragraph }] of updated.slice(0, existing.length).entries()) {
+      const oldBlock = existing[index];
+      const displayed = oldBlock.paragraph.rich_text.map(item => [item.plain_text, item.href ?? null]);
+      const next = paragraph.rich_text.map(item => [item.text.content, item.text.link?.url ?? null]);
       if (JSON.stringify(displayed) !== JSON.stringify(next)) {
-        await notion(`blocks/${existing.id}`, 'PATCH', { paragraph: updated.paragraph });
+        await notion(`blocks/${oldBlock.id}`, 'PATCH', { paragraph });
       }
-    } else if (blocks.some(block => block.heading_2?.rich_text[0]?.plain_text === '활동자 사후내역')) {
-      await notion(`blocks/${wrapperId}/children`, 'PATCH', { children: [updated] });
+    }
+    const heading = blocks.find(block => block.heading_2?.rich_text[0]?.plain_text === '활동자 사후내역');
+    const missing = updated.slice(existing.length);
+    let after = existing.at(-1)?.id ?? heading?.id;
+    for (let index = 0; after && index < missing.length; index += 100) {
+      const added = await notion(`blocks/${wrapperId}/children`, 'PATCH', {
+        position: { type: 'after_block', after_block: { id: after } },
+        children: missing.slice(index, index + 100),
+      });
+      after = added.results.at(-1)?.id;
+    }
+    for (const stale of existing.slice(updated.length)) {
+      await notion(`blocks/${stale.id}`, 'PATCH', { in_trash: true });
     }
     return;
   }

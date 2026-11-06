@@ -77,7 +77,7 @@ function organizerDetails(date, slot, name, headcount, findings, changes, notes)
     noteSection('활동 변경 지연/누락 사유', changes),
     noteSection('특이사항', notes),
     block('heading_2', '활동자 사후내역'),
-    organizerResponses([]),
+    ...organizerResponses([]),
   ];
 }
 
