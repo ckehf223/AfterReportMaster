@@ -308,7 +308,7 @@ export default async function submit(request) {
     saveReport = sessionId => notionRequest('pages', 'POST', {
       parent: { type: 'data_source_id', data_source_id: participantsSource },
       properties: {
-        '응답명': { title: [{ text: { content: name } }] },
+        title: { title: [{ text: { content: name } }] },
         '타임': { relation: [{ id: sessionId }] },
         '본인 찾기 건수': { number: findings },
         '건의사항': richText(suggestions),
