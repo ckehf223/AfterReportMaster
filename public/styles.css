@@ -54,7 +54,7 @@ legend span { margin-right: 5px; color: #466448; }
 .fields > label, .date-field > label { display: block; min-width: 0; font-weight: 700; font-size: .89rem; }
 .required { color: #40673e; }
 .optional { color: var(--muted); font-weight: 500; font-size: .73rem; margin-left: 3px; }
-input:not([type="radio"]), select, textarea { width: 100%; min-width: 0; min-height: 46px; margin-top: 7px; border: 1px solid #c7cfc1; border-radius: 9px; padding: 10px 11px; background: #fffef9; color: var(--ink); font-size: 1rem; font-weight: 500; }
+input:not([type="radio"]):not([type="checkbox"]), select, textarea { width: 100%; min-width: 0; min-height: 46px; margin-top: 7px; border: 1px solid #c7cfc1; border-radius: 9px; padding: 10px 11px; background: #fffef9; color: var(--ink); font-size: 1rem; font-weight: 500; }
 textarea { display: block; resize: none; line-height: 1.55; }
 .date-field { min-width: 0; }
 .date-field input { cursor: pointer; font-variant-numeric: tabular-nums; }
@@ -86,6 +86,11 @@ small { display: block; margin-top: 6px; color: var(--muted); font-weight: 500; 
 .score-options label:hover span { background: var(--soft); }
 .score-options input:checked + span { background: var(--green); border-color: var(--green); color: white; }
 .score-options input:focus-visible + span { outline: 3px solid #658b62; outline-offset: 2px; }
+.checklist-guide { margin: 0 0 10px; color: var(--muted); font-size: .83rem; line-height: 1.55; }
+.checklist-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.checklist-options label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 12px; border: 1px solid #c7cfc1; border-radius: 9px; background: #fffef9; font-size: .89rem; font-weight: 700; cursor: pointer; }
+.checklist-options label:hover { background: var(--soft); }
+.checklist-options input { width: 18px; height: 18px; margin: 0; accent-color: var(--green); cursor: pointer; }
 .actions { display: flex; gap: 10px; justify-content: space-between; }
 .error { padding: 11px 14px; border-radius: 9px; color: #8d2828; background: #faeae4; line-height: 1.55; }
 .ending { text-align: center; padding: clamp(44px, 9vw, 86px) 19px; }

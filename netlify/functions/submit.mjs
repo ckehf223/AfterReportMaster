@@ -5,6 +5,11 @@ import { organizerResponses, ORGANIZER_BODY_MARKER, queueDailyAnalysis } from '.
 import { notionRequest } from '../lib/notion.mjs';
 
 const SLOTS = new Set(['1타임', '2타임', '3타임', '4타임', '그 외']);
+const OMEGA3_ITEMS = [
+  ['omega3AfterReport', '사후'],
+  ['omega3Tm', '티엠'],
+  ['omega3Prayer', '기도'],
+];
 const SCORE_PROPERTIES = ['활동 이해', '안내 준수', '활동 범위 확인', '찾기 기록'];
 const SCORE_QUESTIONS = [
   '활동을 시작하기 전에 오늘 할 일을 이해했다.',
@@ -59,7 +64,7 @@ function reportDetails(date, slot, role, name, results) {
   ];
 }
 
-function organizerDetails(date, slot, name, headcount, findings, changes, notes) {
+function organizerDetails(date, slot, name, headcount, findings, changes, notes, omega3) {
   const details = reportDetails(date, slot, '주관자', name, [
     `활동 인원수: ${headcount}명`, `전체 찾기 건수: ${findings}건`,
   ]);
@@ -76,6 +81,8 @@ function organizerDetails(date, slot, name, headcount, findings, changes, notes)
     { type: 'divider', divider: {} },
     noteSection('활동 변경 지연/누락 사유', changes),
     noteSection('특이사항', notes),
+    block('heading_2', '오메가-3'),
+    ...omega3,
     block('heading_2', '활동자 사후내역'),
     ...organizerResponses([]),
   ];
@@ -272,7 +279,9 @@ export default async function submit(request) {
       '특이사항': richText(notes),
       '주관자 제출 완료': { checkbox: true },
     };
-    const body = organizerDetails(date, slot, name, headcount, findings, changes, notes);
+    const omega3 = OMEGA3_ITEMS.map(([field, label]) =>
+      block('to_do', label, { checked: input[field] === 'on' }));
+    const body = organizerDetails(date, slot, name, headcount, findings, changes, notes, omega3);
     saveReport = sessionId => saveOrganizerReport(sessionId, properties, body, token);
   } else {
     const scores = SCORE_PROPERTIES.map((_, index) => count(input[`score${index + 1}`]));
