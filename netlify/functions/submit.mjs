@@ -5,13 +5,10 @@ import { organizerResponses, ORGANIZER_BODY_MARKER, queueDailyAnalysis } from '.
 import { notionRequest } from '../lib/notion.mjs';
 
 const SLOTS = new Set(['1타임', '2타임', '3타임', '4타임', '그 외']);
-const PARTICIPANT_OMEGA3_ITEMS = [
+const OMEGA3_ITEMS = [
+  ['omega3AfterReport', '사후'],
   ['omega3Tm', '티엠'],
   ['omega3Prayer', '기도'],
-];
-const ORGANIZER_OMEGA3_ITEMS = [
-  ['omega3AfterReport', '사후'],
-  ...PARTICIPANT_OMEGA3_ITEMS,
 ];
 const SCORE_PROPERTIES = ['활동 이해', '안내 준수', '활동 범위 확인', '찾기 기록'];
 const SCORE_QUESTIONS = [
@@ -53,10 +50,10 @@ function block(type, value, options) {
   return { type, [type]: { ...richText(value), ...options } };
 }
 
-function omega3Details(input, items) {
+function omega3Details(input) {
   return [
     block('heading_2', '오메가-3'),
-    ...items.map(([field, label]) => block('to_do', label, { checked: input[field] === 'on' })),
+    ...OMEGA3_ITEMS.map(([field, label]) => block('to_do', label, { checked: input[field] === 'on' })),
   ];
 }
 
@@ -284,7 +281,7 @@ export default async function submit(request) {
       '특이사항': richText(notes),
       '주관자 제출 완료': { checkbox: true },
     };
-    const omega3 = omega3Details(input, ORGANIZER_OMEGA3_ITEMS);
+    const omega3 = omega3Details(input);
     const body = organizerDetails(date, slot, name, headcount, findings, changes, notes, omega3);
     saveReport = sessionId => saveOrganizerReport(sessionId, properties, body, token);
   } else {
@@ -296,7 +293,7 @@ export default async function submit(request) {
       SCORE_PROPERTIES.map((property, index) => [property, { number: scores[index] }]),
     );
     const suggestions = text(input.suggestions, 1500);
-    const omega3 = omega3Details(input, PARTICIPANT_OMEGA3_ITEMS);
+    const omega3 = omega3Details(input);
     saveReport = sessionId => notionRequest('pages', 'POST', {
       parent: { type: 'data_source_id', data_source_id: participantsSource },
       properties: {
