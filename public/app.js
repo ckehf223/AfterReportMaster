@@ -36,25 +36,13 @@ function mountScreen(role, content) {
   reportView.append(content);
   const section = reportView.querySelector('#form');
   const form = section.querySelector('#report-form');
-  const slot = form.elements.slot;
-  const otherCode = form.elements.otherCode;
-  const otherField = form.querySelector('#other-field');
   const errorMessage = form.querySelector('#submit-error');
   const submitButton = form.querySelector('#send');
   const ending = reportView.querySelector('#done');
 
-  function syncOtherField() {
-    const isOther = slot.value === '그 외';
-    otherField.hidden = !isOther;
-    otherCode.disabled = !isOther;
-    otherCode.required = isOther;
-  }
-
   for (const button of reportView.querySelectorAll('[data-home]')) {
     button.addEventListener('click', goHome);
   }
-  slot.addEventListener('change', syncOtherField);
-  syncOtherField();
   setupDatePicker(form);
   focusScreen(section, 'form');
 
@@ -80,8 +68,7 @@ function mountScreen(role, content) {
       }
       if (!form.isConnected) return;
 
-      ending.querySelector('#receipt').textContent = [answers.date, answers.slot, answers.otherCode?.trim()]
-        .filter(Boolean).join(' · ');
+      ending.querySelector('#receipt').textContent = `${answers.date} · ${answers.slot}`;
       form.reset();
       section.hidden = true;
       ending.hidden = false;

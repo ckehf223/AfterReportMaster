@@ -5,10 +5,13 @@ import { organizerResponses, ORGANIZER_BODY_MARKER, queueDailyAnalysis } from '.
 import { notionRequest } from '../lib/notion.mjs';
 
 const SLOTS = new Set(['1타임', '2타임', '3타임', '4타임', '그 외']);
-const OMEGA3_ITEMS = [
-  ['omega3AfterReport', '사후'],
+const PARTICIPANT_OMEGA3_ITEMS = [
   ['omega3Tm', '티엠'],
   ['omega3Prayer', '기도'],
+];
+const ORGANIZER_OMEGA3_ITEMS = [
+  ['omega3AfterReport', '사후'],
+  ...PARTICIPANT_OMEGA3_ITEMS,
 ];
 const SCORE_PROPERTIES = ['활동 이해', '안내 준수', '활동 범위 확인', '찾기 기록'];
 const SCORE_QUESTIONS = [
@@ -50,6 +53,13 @@ function block(type, value, options) {
   return { type, [type]: { ...richText(value), ...options } };
 }
 
+function omega3Details(input, items) {
+  return [
+    block('heading_2', '오메가-3'),
+    ...items.map(([field, label]) => block('to_do', label, { checked: input[field] === 'on' })),
+  ];
+}
+
 function reportDetails(date, slot, role, name, results) {
   const bullet = value => block('bulleted_list_item', value);
   return [
@@ -81,14 +91,13 @@ function organizerDetails(date, slot, name, headcount, findings, changes, notes,
     { type: 'divider', divider: {} },
     noteSection('활동 변경 지연/누락 사유', changes),
     noteSection('특이사항', notes),
-    block('heading_2', '오메가-3'),
     ...omega3,
     block('heading_2', '활동자 사후내역'),
     ...organizerResponses([]),
   ];
 }
 
-function participantDetails(date, slot, name, findings, scores, suggestions) {
+function participantDetails(date, slot, name, findings, scores, suggestions, omega3) {
   return [
     ...reportDetails(date, slot, '활동자', name, [`찾기 건수: ${findings}건`]),
     block('bulleted_list_item', '체크리스트 내역', {
@@ -96,6 +105,7 @@ function participantDetails(date, slot, name, findings, scores, suggestions) {
         block('bulleted_list_item', `${question} : ${scores[index]}점`)),
     }),
     block('bulleted_list_item', `건의사항: ${suggestions || '없습니다.'}`),
+    ...omega3,
   ];
 }
 
@@ -243,7 +253,6 @@ export default async function submit(request) {
 
   const date = text(input.date, 20);
   const slot = text(input.slot, 20);
-  const otherCode = slot === '그 외' ? text(input.otherCode, 40) : '';
   const name = text(input.name, 80);
   const findings = count(input.findings);
   const organizer = input.role === 'organizer';
@@ -254,10 +263,6 @@ export default async function submit(request) {
   if (!validDate(date) || !SLOTS.has(slot) || !name || findings === null) {
     return reply(400, { error: '활동일, 활동 시간, 성명과 찾기 건수를 확인해 주세요.' });
   }
-  if (slot === '그 외' && (!otherCode || otherCode.includes('|'))) {
-    return reply(400, { error: '안내받은 추가 회차 코드를 확인해 주세요.' });
-  }
-
   const token = process.env.NOTION_TOKEN;
   const sessionsSource = process.env.NOTION_SESSIONS_DATA_SOURCE_ID;
   const participantsSource = process.env.NOTION_PARTICIPANTS_DATA_SOURCE_ID;
@@ -279,8 +284,7 @@ export default async function submit(request) {
       '특이사항': richText(notes),
       '주관자 제출 완료': { checkbox: true },
     };
-    const omega3 = OMEGA3_ITEMS.map(([field, label]) =>
-      block('to_do', label, { checked: input[field] === 'on' }));
+    const omega3 = omega3Details(input, ORGANIZER_OMEGA3_ITEMS);
     const body = organizerDetails(date, slot, name, headcount, findings, changes, notes, omega3);
     saveReport = sessionId => saveOrganizerReport(sessionId, properties, body, token);
   } else {
@@ -292,6 +296,7 @@ export default async function submit(request) {
       SCORE_PROPERTIES.map((property, index) => [property, { number: scores[index] }]),
     );
     const suggestions = text(input.suggestions, 1500);
+    const omega3 = omega3Details(input, PARTICIPANT_OMEGA3_ITEMS);
     saveReport = sessionId => notionRequest('pages', 'POST', {
       parent: { type: 'data_source_id', data_source_id: participantsSource },
       properties: {
@@ -301,11 +306,11 @@ export default async function submit(request) {
         '건의사항': richText(suggestions),
         ...scoreValues,
       },
-      children: participantDetails(date, slot, name, findings, scores, suggestions),
+      children: participantDetails(date, slot, name, findings, scores, suggestions, omega3),
     }, token);
   }
 
-  const key = [date, slot, otherCode].filter(Boolean).join(' | ');
+  const key = `${date} | ${slot}`;
   try {
     const sessionId = await getOrCreateSession(key, sessionsSource, token);
     await saveReport(sessionId);

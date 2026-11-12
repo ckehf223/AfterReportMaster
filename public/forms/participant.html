@@ -38,19 +38,6 @@
             <option>그 외</option>
           </select>
         </label>
-        <label id="other-field" class="full" hidden
-          >추가 회차 코드 <span class="required" aria-hidden="true">*</span>
-          <input
-            name="otherCode"
-            maxlength="40"
-            placeholder="예: 추가-01"
-            aria-describedby="other-help"
-            disabled
-          />
-          <small id="other-help"
-            >‘그 외’ 활동에 안내된 회차 코드를 입력해 주세요.</small
-          >
-        </label>
         <label class="full"
           >활동자 성명 <span class="required" aria-hidden="true">*</span
           ><input
@@ -184,6 +171,15 @@
             placeholder="다음 활동에 반영하면 좋을 내용을 적어주세요."
           ></textarea>
         </label>
+      </div>
+    </fieldset>
+
+    <fieldset class="form-section" aria-describedby="omega3-help">
+      <legend><span>04</span> 오메가-3</legend>
+      <p id="omega3-help" class="checklist-guide">완료한 항목에 체크해 주세요.</p>
+      <div class="checklist-options">
+        <label><input type="checkbox" name="omega3Tm"> 티엠</label>
+        <label><input type="checkbox" name="omega3Prayer"> 기도</label>
       </div>
     </fieldset>
 

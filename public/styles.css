@@ -74,7 +74,6 @@ textarea { display: block; resize: none; line-height: 1.55; }
 .calendar-days button[aria-current="date"] { border-color: #658b62; }
 .calendar-days button[aria-pressed="true"] { background: var(--green); color: #fff; }
 input::placeholder, textarea::placeholder { color: #667165; opacity: 1; }
-small { display: block; margin-top: 6px; color: var(--muted); font-weight: 500; }
 .rating-guide { margin: 0 0 12px; color: var(--muted); font-size: .83rem; line-height: 1.55; }
 .rating-question { min-width: 0; margin: 0; padding: 0 0 14px; border: 0; }
 .rating-question + .rating-question { margin-top: 6px; }
