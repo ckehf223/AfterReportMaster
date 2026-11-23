@@ -54,7 +54,11 @@
             <option>자양역</option>
             <option>잠실</option>
             <option>천호</option>
+            <option value="custom" hidden disabled>직접 입력</option>
           </select>
+        </label>
+        <label class="full" hidden>활동 장소 직접 입력 <span class="required" aria-hidden="true">*</span>
+          <input type="text" name="customLocation" maxlength="80" placeholder="활동 장소를 입력해 주세요" disabled />
         </label>
         <fieldset class="time-field full" aria-describedby="activity-time-guide">
           <legend>활동 시간 <span class="required" aria-hidden="true">*</span></legend>

@@ -21,6 +21,38 @@ function goHome() {
   else if (pendingForm) loadScreen();
 }
 
+function setupCustomLocation(form) {
+  const select = form.elements.namedItem('location');
+  const option = select?.querySelector('option[value="custom"]');
+  const input = form.elements.namedItem('customLocation');
+  if (!option || !input) return;
+  const label = input.closest('label');
+
+  function validate() {
+    const whitespaceOnly = !input.disabled && input.value && !input.value.trim();
+    input.setCustomValidity(whitespaceOnly ? '활동 장소를 입력해 주세요.' : '');
+  }
+
+  function sync() {
+    const needsInput = select.value === 'custom';
+    label.hidden = !needsInput;
+    input.disabled = !needsInput;
+    input.required = needsInput;
+    validate();
+  }
+
+  select.addEventListener('change', () => {
+    sync();
+    if (!input.disabled) input.focus();
+  });
+  input.addEventListener('input', validate);
+  form.addEventListener('reset', () => queueMicrotask(sync));
+  option.hidden = false;
+  option.disabled = false;
+  sync();
+  return validate;
+}
+
 function readTimeRange(row) {
   const start = row.querySelector('[data-time-start]');
   const end = row.querySelector('[data-time-end]');
@@ -85,12 +117,14 @@ function mountScreen(role, content) {
   }
   setupDatePicker(form);
   setupTimeRanges(timeField);
+  const validateCustomLocation = setupCustomLocation(form);
   focusScreen(section, 'form');
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (submitButton.disabled) return;
 
+    validateCustomLocation?.();
     const timeRanges = Array.from(timeField.querySelectorAll('[data-time-row]'), readTimeRange);
     if (!form.reportValidity()) return;
 

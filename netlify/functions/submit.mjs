@@ -318,7 +318,6 @@ export default async function submit(request) {
   const date = text(input.date, 20);
   const slot = text(input.slot, 20);
   const name = text(input.name, 80);
-  const location = text(input.location, 40);
   const findings = count(input.findings);
   const organizer = input.role === 'organizer';
   const { timeRanges } = input;
@@ -330,7 +329,13 @@ export default async function submit(request) {
   if (!validDate(date) || !slotIsValid || !name || findings === null) {
     return reply(400, { error: '활동일, 타임, 성명과 찾기 건수를 확인해 주세요.' });
   }
-  if (input.location !== undefined && !LOCATIONS.has(location)) {
+  let location = text(input.location, 40);
+  if (location === 'custom') {
+    location = typeof input.customLocation === 'string' ? input.customLocation.trim() : '';
+    if (!location || location.length > 80 || /[\r\n\u2028\u2029]/.test(location)) {
+      return reply(400, { error: '활동 장소를 80자 이내의 한 줄로 입력해 주세요.' });
+    }
+  } else if (input.location !== undefined && !LOCATIONS.has(location)) {
     return reply(400, { error: '목록에서 활동 장소를 선택해 주세요.' });
   }
   // Earlier form versions submit the original checklist without any time fields.
