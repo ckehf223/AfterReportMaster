@@ -51,13 +51,22 @@ legend { padding: 0 12px 0 0; font-weight: 800; letter-spacing: -.025em; }
 legend span { margin-right: 5px; color: #466448; }
 .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 17px 15px; }
 .full { grid-column: 1 / -1; }
-.fields > label, .date-field > label { display: block; min-width: 0; font-weight: 700; font-size: .89rem; }
+.fields > label, .date-field > label, .time-field legend, .time-row label { display: block; min-width: 0; font-weight: 700; font-size: .89rem; }
 .required { color: #40673e; }
 .optional { color: var(--muted); font-weight: 500; font-size: .73rem; margin-left: 3px; }
 input:not([type="radio"]):not([type="checkbox"]), select, textarea { width: 100%; min-width: 0; min-height: 46px; margin-top: 7px; border: 1px solid #c7cfc1; border-radius: 9px; padding: 10px 11px; background: #fffef9; color: var(--ink); font-size: 1rem; font-weight: 500; }
 textarea { display: block; resize: none; line-height: 1.55; }
 .date-field { min-width: 0; }
 .date-field input { cursor: pointer; font-variant-numeric: tabular-nums; }
+.time-field { min-width: 0; margin: 0; padding: 0; border: 0; }
+.time-field legend { margin-bottom: 7px; }
+.time-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 6px; max-width: 460px; }
+.time-row-with-action { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto; }
+.time-row + .time-row { margin-top: 10px; }
+.time-row label { color: var(--muted); font-size: .8rem; }
+.time-row input[type="time"] { padding-inline: clamp(4px, 1.5vw, 11px); font-variant-numeric: tabular-nums; }
+.time-separator { display: grid; place-items: center; min-height: 46px; color: var(--muted); }
+.time-action { min-height: 46px; padding-inline: clamp(7px, 1.6vw, 13px); font-size: .85rem; white-space: nowrap; }
 .date-picker button { min-height: 44px; border: 1px solid #c7cfc1; border-radius: 8px; background: #fffef9; color: var(--green); font-weight: 700; }
 .date-picker button:hover:not(:disabled) { background: var(--soft); }
 .date-picker { width: min(100% - 32px, 360px); max-height: calc(100% - 32px); padding: 16px; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: var(--paper); box-shadow: 0 12px 40px #1c312730; }
@@ -78,6 +87,7 @@ input::placeholder, textarea::placeholder { color: #667165; opacity: 1; }
 .rating-question { min-width: 0; margin: 0; padding: 0 0 14px; border: 0; }
 .rating-question + .rating-question { margin-top: 6px; }
 .rating-question legend { padding: 0; font-size: .89rem; line-height: 1.5; }
+.rating-example { margin: 3px 0 0; color: var(--muted); font-size: .8rem; line-height: 1.5; }
 .score-options { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: 8px; max-width: 350px; }
 .score-options label { position: relative; cursor: pointer; }
 .score-options input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
@@ -106,6 +116,17 @@ footer span { font-weight: 750; }
   .fields { grid-template-columns: 1fr; gap: 15px; }
   .form-intro { margin-bottom: 24px; }
   .actions .primary { flex: 1; }
+}
+
+@media (max-width: 390px) {
+  .time-row { gap: 4px; }
+  .time-row input[type="time"] { padding-inline: 3px; }
+  .time-row input[type="time"]::-webkit-calendar-picker-indicator { margin-inline-start: 0; }
+}
+
+@media (max-width: 370px) {
+  .time-row-with-action { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .time-action { grid-column: 3; justify-self: end; }
 }
 
 @media (prefers-reduced-motion: reduce) {

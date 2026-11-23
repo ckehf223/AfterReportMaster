@@ -1,22 +1,31 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as wait } from 'node:timers/promises';
 import { getStore } from '@netlify/blobs';
-import { organizerResponses, ORGANIZER_BODY_MARKER, queueDailyAnalysis } from '../lib/daily-analysis.mjs';
+import {
+  organizerResponses, ORGANIZER_BODY_MARKER, queueDailyAnalysis, SCORE_PROPERTIES,
+} from '../lib/daily-analysis.mjs';
 import { notionRequest } from '../lib/notion.mjs';
 
 const SLOTS = new Set(['1타임', '2타임', '3타임', '4타임', '그 외']);
+const CLOCK_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const OMEGA3_ITEMS = [
   ['omega3AfterReport', '사후'],
   ['omega3Tm', '티엠'],
   ['omega3Prayer', '기도'],
 ];
-const SCORE_PROPERTIES = ['활동 이해', '안내 준수', '활동 범위 확인', '찾기 기록'];
-const SCORE_QUESTIONS = [
+const LEGACY_SCORE_QUESTIONS = [
   '활동을 시작하기 전에 오늘 할 일을 이해했다.',
   '안내받은 순서에 따라 활동했다.',
   '맡은 활동 범위를 끝까지 확인했다.',
   '찾은 내용을 빠짐없이 기록했다.',
 ];
+const SCORE_QUESTIONS = [
+  '나는 오늘 멘트가 준비 된 상태로 활동에 임하였다.',
+  '나는 오늘 묵상 어록 나눔대로 활동에 임하였다.',
+  '나는 오늘 내 활동에서 복기해야 할 부분에 대해 자가 피드백이 되었다.',
+  '찾은 내용을 빠짐없이 기록했다.',
+];
+const SCORE_EXAMPLE = '*Ex) 자가피드백(잘한 점,부족한 점, 개선할 점과 실행할 점)';
 const SESSION_RESERVATION_MS = 90_000;
 const SESSION_WAIT_MS = 15_000;
 
@@ -43,7 +52,9 @@ function count(value) {
 }
 
 function richText(value) {
-  return { rich_text: value ? [{ text: { content: value } }] : [] };
+  // Notion limits each rich-text item's content to 2,000 characters.
+  const parts = value.match(/.{1,2000}/gsu) ?? [];
+  return { rich_text: parts.map(content => ({ text: { content } })) };
 }
 
 function block(type, value, options) {
@@ -57,22 +68,24 @@ function omega3Details(input) {
   ];
 }
 
-function reportDetails(date, slot, role, name, results) {
+function reportDetails(date, slot, roleLabel, timeRanges, name, results) {
   const bullet = value => block('bulleted_list_item', value);
+  const times = timeRanges?.map(({ start, end }) => `${start} - ${end}`).join('\n');
   return [
     block('heading_2', '상세내역'),
     { type: 'divider', divider: {} },
     block('heading_3', '1️⃣ 활동 정보'),
     bullet(`활동일: ${date}`),
-    bullet(`활동 시간: ${slot}`),
-    bullet(`${role} 이름: ${name}`),
+    bullet(`${roleLabel} 타임: ${slot}`),
+    ...(times ? [bullet(`${roleLabel} 시간: ${times}`)] : []),
+    bullet(`${roleLabel}자 이름: ${name}`),
     block('heading_3', '2️⃣ 활동 결과'),
     ...results.map(bullet),
   ];
 }
 
-function organizerDetails(date, slot, name, headcount, findings, changes, notes, omega3) {
-  const details = reportDetails(date, slot, '주관자', name, [
+function organizerDetails(date, slot, timeRanges, name, headcount, findings, changes, notes, omega3) {
+  const details = reportDetails(date, slot, '주관', timeRanges, name, [
     `활동 인원수: ${headcount}명`, `전체 찾기 건수: ${findings}건`,
   ]);
   // Tag only our synced block so resubmissions never replace hand-written page sections.
@@ -94,12 +107,15 @@ function organizerDetails(date, slot, name, headcount, findings, changes, notes,
   ];
 }
 
-function participantDetails(date, slot, name, findings, scores, suggestions, omega3) {
+function participantDetails(date, slot, timeRanges, name, findings, scores, suggestions, omega3) {
+  const questions = timeRanges ? SCORE_QUESTIONS : LEGACY_SCORE_QUESTIONS;
   return [
-    ...reportDetails(date, slot, '활동자', name, [`찾기 건수: ${findings}건`]),
+    ...reportDetails(date, slot, '활동', timeRanges, name, [`찾기 건수: ${findings}건`]),
     block('bulleted_list_item', '체크리스트 내역', {
-      children: SCORE_QUESTIONS.map((question, index) =>
-        block('bulleted_list_item', `${question} : ${scores[index]}점`)),
+      children: questions.map((question, index) => {
+        const example = timeRanges && index === 2 ? `\n${SCORE_EXAMPLE}` : '';
+        return block('bulleted_list_item', `${question} : ${scores[index]}점${example}`);
+      }),
     }),
     block('bulleted_list_item', `건의사항: ${suggestions || '없습니다.'}`),
     ...omega3,
@@ -110,6 +126,12 @@ function validDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(value);
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function validTimeRange(range) {
+  const { start, end } = range ?? {};
+  return typeof start === 'string' && typeof end === 'string' &&
+    CLOCK_TIME.test(start) && CLOCK_TIME.test(end) && start < end;
 }
 
 async function findSession(key, source, token) {
@@ -253,12 +275,20 @@ export default async function submit(request) {
   const name = text(input.name, 80);
   const findings = count(input.findings);
   const organizer = input.role === 'organizer';
+  const { timeRanges } = input;
 
   if (!organizer && input.role !== 'participant') {
     return reply(400, { error: '주관자 또는 활동자 양식을 선택해 주세요.' });
   }
-  if (!validDate(date) || !SLOTS.has(slot) || !name || findings === null) {
-    return reply(400, { error: '활동일, 활동 시간, 성명과 찾기 건수를 확인해 주세요.' });
+  const slotIsValid = SLOTS.has(slot) && (!organizer || timeRanges === undefined || slot !== '4타임');
+  if (!validDate(date) || !slotIsValid || !name || findings === null) {
+    return reply(400, { error: '활동일, 타임, 성명과 찾기 건수를 확인해 주세요.' });
+  }
+  // Earlier form versions submit the original checklist without any time fields.
+  if (timeRanges !== undefined && (!Array.isArray(timeRanges) || !timeRanges.length ||
+      (organizer && timeRanges.length !== 1) || !timeRanges.every(validTimeRange))) {
+    const label = organizer ? '주관 시간' : '활동 시간';
+    return reply(400, { error: `${label}을 확인해 주세요. 종료 시간은 시작 시간보다 늦어야 해요.` });
   }
   const token = process.env.NOTION_TOKEN;
   const sessionsSource = process.env.NOTION_SESSIONS_DATA_SOURCE_ID;
@@ -282,7 +312,7 @@ export default async function submit(request) {
       '주관자 제출 완료': { checkbox: true },
     };
     const omega3 = omega3Details(input);
-    const body = organizerDetails(date, slot, name, headcount, findings, changes, notes, omega3);
+    const body = organizerDetails(date, slot, timeRanges, name, headcount, findings, changes, notes, omega3);
     saveReport = sessionId => saveOrganizerReport(sessionId, properties, body, token);
   } else {
     const scores = SCORE_PROPERTIES.map((_, index) => count(input[`score${index + 1}`]));
@@ -303,7 +333,7 @@ export default async function submit(request) {
         '건의사항': richText(suggestions),
         ...scoreValues,
       },
-      children: participantDetails(date, slot, name, findings, scores, suggestions, omega3),
+      children: participantDetails(date, slot, timeRanges, name, findings, scores, suggestions, omega3),
     }, token);
   }
 

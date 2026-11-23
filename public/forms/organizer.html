@@ -12,12 +12,20 @@
           <label for="activity-date">활동일 <span class="required" aria-hidden="true">*</span></label>
           <input id="activity-date" type="text" name="date" placeholder="날짜를 선택해 주세요" pattern="[0-9]{4}-[0-9]{2}-[0-9]{2}" maxlength="10" autocomplete="off" inputmode="none" aria-haspopup="dialog" required>
         </div>
-        <label>활동 시간 <span class="required" aria-hidden="true">*</span>
+        <label>주관 타임 <span class="required" aria-hidden="true">*</span>
           <select name="slot" required>
             <option value="">타임을 선택해 주세요</option>
-            <option>1타임</option><option>2타임</option><option>3타임</option><option>4타임</option><option>그 외</option>
+            <option>1타임</option><option>2타임</option><option>3타임</option><option>그 외</option>
           </select>
         </label>
+        <fieldset class="time-field full">
+          <legend>주관 시간 <span class="required" aria-hidden="true">*</span></legend>
+          <div class="time-row" data-time-row>
+            <label>시작시간 <input type="time" data-time-start required></label>
+            <span class="time-separator" aria-hidden="true">–</span>
+            <label>종료시간 <input type="time" data-time-end required></label>
+          </div>
+        </fieldset>
         <label class="full">주관자 성명 <span class="required" aria-hidden="true">*</span><input name="name" autocomplete="name" maxlength="80" placeholder="성명을 입력해 주세요" required></label>
       </div>
     </fieldset>

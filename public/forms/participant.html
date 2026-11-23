@@ -28,7 +28,7 @@
           />
         </div>
         <label
-          >활동 시간 <span class="required" aria-hidden="true">*</span>
+          >활동 타임 <span class="required" aria-hidden="true">*</span>
           <select name="slot" required>
             <option value="">타임을 선택해 주세요</option>
             <option>1타임</option>
@@ -38,6 +38,15 @@
             <option>그 외</option>
           </select>
         </label>
+        <fieldset class="time-field full">
+          <legend>활동 시간 <span class="required" aria-hidden="true">*</span></legend>
+          <div class="time-row time-row-with-action" data-time-row role="group" aria-label="활동 시간 구간">
+            <label>시작시간 <input type="time" data-time-start required /></label>
+            <span class="time-separator" aria-hidden="true">–</span>
+            <label>종료시간 <input type="time" data-time-end required /></label>
+            <button type="button" class="button secondary time-action" data-add-time aria-label="활동 시간 추가">추가</button>
+          </div>
+        </fieldset>
         <label class="full"
           >활동자 성명 <span class="required" aria-hidden="true">*</span
           ><input
@@ -60,7 +69,7 @@
         그렇다’예요.
       </p>
       <fieldset class="rating-question">
-        <legend>1. 활동을 시작하기 전에 오늘 할 일을 이해했다.</legend>
+        <legend>1. 나는 오늘 멘트가 준비 된 상태로 활동에 임하였다.</legend>
         <div class="score-options">
           <label
             ><input type="radio" name="score1" value="1" required /><span
@@ -82,7 +91,7 @@
         </div>
       </fieldset>
       <fieldset class="rating-question">
-        <legend>2. 안내받은 순서에 따라 활동했다.</legend>
+        <legend>2. 나는 오늘 묵상 어록 나눔대로 활동에 임하였다.</legend>
         <div class="score-options">
           <label
             ><input type="radio" name="score2" value="1" required /><span
@@ -103,8 +112,9 @@
           >
         </div>
       </fieldset>
-      <fieldset class="rating-question">
-        <legend>3. 맡은 활동 범위를 끝까지 확인했다.</legend>
+      <fieldset class="rating-question" aria-describedby="feedback-example">
+        <legend>3. 나는 오늘 내 활동에서 복기해야 할 부분에 대해 자가 피드백이 되었다.</legend>
+        <p class="rating-example" id="feedback-example">*Ex) 자가피드백(잘한 점,부족한 점, 개선할 점과 실행할 점)</p>
         <div class="score-options">
           <label
             ><input type="radio" name="score3" value="1" required /><span

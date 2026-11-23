@@ -20,6 +20,44 @@ function goHome() {
   else if (pendingForm) loadScreen();
 }
 
+function readTimeRange(row) {
+  const start = row.querySelector('[data-time-start]');
+  const end = row.querySelector('[data-time-end]');
+  const outOfOrder = start.value && end.value && start.value >= end.value;
+  end.setCustomValidity(outOfOrder ? '종료시간은 시작시간보다 늦어야 해요.' : '');
+  return { start: start.value, end: end.value };
+}
+
+function setupTimeRanges(timeField) {
+  timeField.addEventListener('input', event => {
+    readTimeRange(event.target.closest('[data-time-row]'));
+  });
+
+  const addButton = timeField.querySelector('[data-add-time]');
+  if (!addButton) return;
+  const firstRow = addButton.closest('[data-time-row]');
+
+  addButton.addEventListener('click', () => {
+    const row = firstRow.cloneNode(true);
+    const start = row.querySelector('[data-time-start]');
+    const end = row.querySelector('[data-time-end]');
+    start.value = '';
+    end.value = '';
+
+    const removeButton = row.querySelector('[data-add-time]');
+    removeButton.removeAttribute('data-add-time');
+    removeButton.textContent = '삭제';
+    removeButton.setAttribute('aria-label', '이 활동 시간 삭제');
+    removeButton.addEventListener('click', () => {
+      row.remove();
+      addButton.focus();
+    });
+
+    timeField.append(row);
+    start.focus();
+  });
+}
+
 function mountScreen(role, content) {
   const hasRole = Boolean(content);
   cover.hidden = hasRole;
@@ -36,6 +74,7 @@ function mountScreen(role, content) {
   reportView.append(content);
   const section = reportView.querySelector('#form');
   const form = section.querySelector('#report-form');
+  const timeField = form.querySelector('.time-field');
   const errorMessage = form.querySelector('#submit-error');
   const submitButton = form.querySelector('#send');
   const ending = reportView.querySelector('#done');
@@ -44,13 +83,17 @@ function mountScreen(role, content) {
     button.addEventListener('click', goHome);
   }
   setupDatePicker(form);
+  setupTimeRanges(timeField);
   focusScreen(section, 'form');
 
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (submitButton.disabled) return;
 
-    const answers = { ...Object.fromEntries(new FormData(form)), role };
+    const timeRanges = Array.from(timeField.querySelectorAll('[data-time-row]'), readTimeRange);
+    if (!form.reportValidity()) return;
+
+    const answers = { ...Object.fromEntries(new FormData(form)), role, timeRanges };
     errorMessage.hidden = true;
     submitButton.disabled = true;
     const buttonLabel = submitButton.innerHTML;

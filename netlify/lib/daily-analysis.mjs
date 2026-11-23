@@ -2,7 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { getStore } from '@netlify/blobs';
 import { notionRequest } from './notion.mjs';
 
-const QUESTIONS = ['활동 이해', '안내 준수', '활동 범위 확인', '찾기 기록'];
+// The existing Notion columns store scores by position across checklist revisions.
+export const SCORE_PROPERTIES = ['활동 이해', '안내 준수', '활동 범위 확인', '찾기 기록'];
 const TOPICS = [
   ['집결·장소 안내', /집결|장소|위치|길 안내|주소/],
   ['시간·일정', /지연|늦|일정|시간|연기/],
@@ -49,7 +50,7 @@ function countTopics(notes) {
 
 export function collectDailyStats(sessions, participants) {
   const organizers = sessions.filter(page => value(page, '주관자 제출 완료', 'checkbox'));
-  const scores = QUESTIONS.map(question => participants.map(page => number(page, question))
+  const scores = SCORE_PROPERTIES.map(property => participants.map(page => number(page, property))
     .filter(score => Number.isInteger(score) && score >= 1 && score <= 5));
   const sum = (pages, name) => {
     const values = pages.map(page => number(page, name)).filter(Number.isFinite);
@@ -63,7 +64,7 @@ export function collectDailyStats(sessions, participants) {
     participants: participants.length,
     participantFindings: sum(participants, '본인 찾기 건수'),
     scoreAverage: average(scores.flat()),
-    questionAverages: Object.fromEntries(QUESTIONS.map((question, i) => [question, average(scores[i])])),
+    questionAverages: Object.fromEntries(scores.map((values, i) => [`${i + 1}번`, average(values)])),
     organizerIssues: countTopics(organizers.map(page => plain(page, '변경·지연·누락 사유'))),
     organizerNotes: countTopics(organizers.map(page => plain(page, '특이사항'))),
     participantSuggestions: countTopics(participants.map(page => plain(page, '건의사항'))),
@@ -128,9 +129,9 @@ export function organizerResponses(participants) {
     const title = Object.values(page.properties).find(property => property.type === 'title');
     const name = title?.title.map(item => item.plain_text).join('') || '활동자 응답';
     const findings = number(page, '본인 찾기 건수');
-    const scores = QUESTIONS.map(question => {
-      const score = number(page, question);
-      return `${question} ${score >= 1 && score <= 5 ? `${score}/5` : '미응답'}`;
+    const scores = SCORE_PROPERTIES.map((property, index) => {
+      const score = number(page, property);
+      return `${index + 1}번 ${score >= 1 && score <= 5 ? `${score}/5` : '미응답'}`;
     }).join(' · ');
     const suggestions = plain(page, '건의사항').trim().slice(0, 1500) || '없음';
     const details = [
