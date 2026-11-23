@@ -4,7 +4,7 @@
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f9f8f0" />
+    <meta name="theme-color" content="#fafbfc" />
     <meta
       name="description"
       content="하나되어 즐기삼 주관자와 활동자의 사후 보고를 작성합니다."
@@ -12,7 +12,7 @@
     <title>하나되어 즐기삼</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@900&amp;display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@600;750&amp;display=swap" />
     <link rel="stylesheet" href="styles.css" />
     <script defer src="date-picker.js"></script>
     <script defer src="app.js"></script>
@@ -20,41 +20,34 @@
   <body>
     <header class="site-header">
       <div class="shell header-content">
-        <a href="./index.html" class="brand">
-          <span class="brand-mark"><img src="assets/leaf.png" alt="" width="42" height="22" /></span>
-          <strong>하나되어 즐기삼</strong>
-        </a>
+        <a href="./index.html" class="brand">하나되어 즐기삼</a>
+        <ol class="steps" aria-label="진행 단계">
+          <li data-step="cover" aria-current="step">안내</li>
+          <li data-step="form">사후 작성</li>
+          <li data-step="done">제출 완료</li>
+        </ol>
       </div>
     </header>
 
     <main class="shell">
-      <ol class="steps" aria-label="진행 단계">
-        <li data-step="cover" aria-current="step">안내</li>
-        <li data-step="form">사후 작성</li>
-        <li data-step="done">제출 완료</li>
-      </ol>
-
-      <section id="cover" class="panel cover" aria-labelledby="cover-title">
+      <section id="cover" class="cover" aria-labelledby="cover-title">
         <div class="cover-copy">
           <p class="cover-purpose">활동 사후 보고</p>
-          <h1 id="cover-title" tabindex="-1">하나되어 <span>즐기삼</span></h1>
-          <nav class="role-actions" aria-label="작성할 사후 보고">
-            <button type="button" data-role="organizer" class="role-action" aria-labelledby="organizer-action" aria-describedby="organizer-details">
-              <strong id="organizer-action">주관자 사후</strong>
-              <span class="role-arrow" aria-hidden="true">→</span>
-              <small id="organizer-details">참여 인원과 전체 결과</small>
-            </button>
-            <button type="button" data-role="participant" class="role-action" aria-labelledby="participant-action" aria-describedby="participant-details">
-              <strong id="participant-action">활동자 사후</strong>
-              <span class="role-arrow" aria-hidden="true">→</span>
-              <small id="participant-details">활동 시간과 체크리스트</small>
-            </button>
-          </nav>
-          <p id="role-status" class="role-status" role="status"></p>
+          <h1 id="cover-title" tabindex="-1">하나되어 즐기삼</h1>
         </div>
-        <div class="cover-visual">
-          <img class="cover-image" src="assets/together-cover.webp" alt="" width="1254" height="1254" fetchpriority="high" />
-        </div>
+        <nav class="role-actions" aria-label="작성할 사후 보고">
+          <button type="button" data-role="organizer" class="role-action" aria-labelledby="organizer-action" aria-describedby="organizer-details">
+            <strong id="organizer-action">주관자 사후</strong>
+            <small id="organizer-details">참여 인원과 전체 결과</small>
+            <span class="role-arrow" aria-hidden="true">→</span>
+          </button>
+          <button type="button" data-role="participant" class="role-action" aria-labelledby="participant-action" aria-describedby="participant-details">
+            <strong id="participant-action">활동자 사후</strong>
+            <small id="participant-details">활동 시간과 체크리스트</small>
+            <span class="role-arrow" aria-hidden="true">→</span>
+          </button>
+        </nav>
+        <p id="role-status" class="role-status" role="status"></p>
       </section>
 
       <div id="report-view" hidden></div>

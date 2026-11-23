@@ -10,7 +10,6 @@
 | `public/forms/organizer.html` | 주관자 폼과 완료 화면 |
 | `public/forms/participant.html` | 활동자 폼, 체크리스트와 완료 화면 |
 | `public/styles.css` | 색상, 여백, 모바일 레이아웃 |
-| `public/assets/together-cover.webp` | 첫 화면 일러스트 |
 | `public/assets/favicon.svg` | 브라우저 탭의 잎사귀 아이콘 |
 | `public/app.js` | 화면 전환과 제출 상태 |
 | `public/date-picker.js` | 활동일 입력칸과 달력 동작 |
