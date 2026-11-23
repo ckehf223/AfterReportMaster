@@ -490,6 +490,8 @@ textarea { resize: vertical; line-height: 1.6; }
 .time-field legend { margin-bottom: 8px; padding: 0; }
 
 .time-guide { margin: 0 0 11px; color: var(--muted); font-size: .84rem; line-height: 1.58; word-break: keep-all; }
+.time-format { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 750; }
+.time-field[data-direct-time] .time-guide:not(.time-format) { margin-bottom: 4px; }
 
 .time-row {
   display: grid;
@@ -508,6 +510,16 @@ textarea { resize: vertical; line-height: 1.6; }
   font-variant-numeric: tabular-nums;
 }
 
+.time-field[data-direct-time] .time-row input[type="text"] {
+  border-color: #afbdd4;
+  background: #fbfcff;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  letter-spacing: .045em;
+}
+
+.time-field[data-direct-time] .time-row input::placeholder { color: #63728b; font-weight: 600; }
+
 .time-separator {
   display: grid;
   min-height: var(--control-height);
@@ -516,6 +528,7 @@ textarea { resize: vertical; line-height: 1.6; }
 }
 
 .time-action {
+  min-inline-size: 44px;
   padding-inline: clamp(7px, 1.6vw, 13px);
   white-space: nowrap;
   font-size: .85rem;
@@ -777,8 +790,8 @@ textarea { resize: vertical; line-height: 1.6; }
 }
 
 @media (max-width: 370px) {
-  .time-row-with-action { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
-  .time-action { grid-column: 3; justify-self: end; }
+  .time-field:not([data-direct-time]) .time-row-with-action { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .time-field:not([data-direct-time]) .time-action { grid-column: 3; justify-self: end; }
 }
 
 @media (prefers-reduced-motion: reduce) {

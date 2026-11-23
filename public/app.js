@@ -5,6 +5,8 @@ const roleStatus = document.querySelector('#role-status');
 const steps = [...document.querySelectorAll('[data-step]')];
 const roles = { organizer: '주관자', participant: '활동자' };
 const brandTitle = '하나되어 즐기삼';
+const timeInputs = '[data-time-start], [data-time-end]';
+const timeFormatError = '00:00부터 23:59 사이의 시간을 입력해 주세요.';
 let pendingForm;
 
 function focusScreen(section, step) {
@@ -53,17 +55,63 @@ function setupCustomLocation(form) {
   return validate;
 }
 
+function clockValue(value) {
+  const match = /^(\d{1,2}):([0-5]\d)$/.exec(value);
+  if (!match || Number(match[1]) > 23) return '';
+  return `${match[1].padStart(2, '0')}:${match[2]}`;
+}
+
+function formatTimeInput(input, inputType) {
+  const value = input.value;
+  // Keep an explicitly typed single-digit hour editable until the field is left.
+  if (/^\d:\d{0,2}$/.test(value)) return;
+
+  const digits = value.replace(/\D/g, '').slice(0, 4);
+  const formatted = digits.length > 2 ? `${digits.slice(0, 2)}:${digits.slice(2)}` : digits;
+  if (value === formatted) return;
+
+  const digitsBeforeCaret = value.slice(0, input.selectionStart ?? value.length).replace(/\D/g, '').length;
+  const skipSeparator = digitsBeforeCaret === 2 && formatted[2] === ':' && inputType === 'deleteContentForward';
+  const caret = digitsBeforeCaret > 2 || skipSeparator ? digitsBeforeCaret + 1 : digitsBeforeCaret;
+  input.value = formatted;
+  input.setSelectionRange(caret, caret);
+}
+
 function readTimeRange(row) {
   const start = row.querySelector('[data-time-start]');
   const end = row.querySelector('[data-time-end]');
-  const outOfOrder = start.value && end.value && start.value >= end.value;
-  end.setCustomValidity(outOfOrder ? '종료시간은 시작시간보다 늦어야 해요.' : '');
-  return { start: start.value, end: end.value };
+  const startTime = clockValue(start.value);
+  const endTime = clockValue(end.value);
+  const outOfOrder = startTime && endTime && startTime >= endTime;
+
+  start.setCustomValidity(start.value && !startTime ? timeFormatError : '');
+  let endError = end.value && !endTime ? timeFormatError : '';
+  if (outOfOrder) endError = '종료시간은 시작시간보다 늦어야 해요.';
+  end.setCustomValidity(endError);
+  return { start: startTime, end: endTime };
 }
 
 function setupTimeRanges(timeField) {
+  for (const input of timeField.querySelectorAll(timeInputs)) {
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.maxLength = 5;
+    input.placeholder = '00:00';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+  }
+  timeField.dataset.directTime = '';
+  for (const guide of timeField.querySelectorAll('[data-time-format]')) guide.hidden = false;
+
   timeField.addEventListener('input', event => {
+    if (!event.target.matches(timeInputs)) return;
+    formatTimeInput(event.target, event.inputType);
     readTimeRange(event.target.closest('[data-time-row]'));
+  });
+  timeField.addEventListener('focusout', event => {
+    if (!event.target.matches(timeInputs)) return;
+    const time = clockValue(event.target.value);
+    if (time) event.target.value = time;
   });
 
   const addButton = timeField.querySelector('[data-add-time]');

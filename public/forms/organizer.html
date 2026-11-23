@@ -40,8 +40,11 @@
         <label class="full" hidden>활동 장소 직접 입력 <span class="required" aria-hidden="true">*</span>
           <input type="text" name="customLocation" maxlength="80" placeholder="활동 장소를 입력해 주세요" disabled>
         </label>
-        <fieldset class="time-field full">
+        <fieldset class="time-field full" aria-describedby="organizer-time-guide">
           <legend>주관 시간 <span class="required" aria-hidden="true">*</span></legend>
+          <div id="organizer-time-guide">
+            <p class="time-guide time-format" data-time-format hidden>24시간제 · 1530 → 15:30</p>
+          </div>
           <div class="time-row" data-time-row>
             <label>시작시간 <input type="time" data-time-start required></label>
             <span class="time-separator" aria-hidden="true">–</span>
