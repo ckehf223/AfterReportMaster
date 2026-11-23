@@ -3,6 +3,7 @@ const reportView = document.querySelector('#report-view');
 const roleStatus = document.querySelector('#role-status');
 const steps = [...document.querySelectorAll('[data-step]')];
 const roles = { organizer: '주관자', participant: '활동자' };
+const brandTitle = '하나되어 즐기삼';
 let pendingForm;
 
 function focusScreen(section, step) {
@@ -62,7 +63,7 @@ function mountScreen(role, content) {
   cover.hidden = hasRole;
   reportView.hidden = !hasRole;
   reportView.replaceChildren();
-  document.title = hasRole ? '즐기삼 | ' + roles[role] + ' 사후' : '즐기삼 | 활동 사후';
+  document.title = hasRole ? brandTitle + ' | ' + roles[role] + ' 사후' : brandTitle;
 
   if (!hasRole) {
     focusScreen(cover, 'cover');
@@ -113,6 +114,7 @@ function mountScreen(role, content) {
       form.reset();
       section.hidden = true;
       ending.hidden = false;
+      document.title = brandTitle + ' | 제출 완료';
       focusScreen(ending, 'done');
     } catch (error) {
       if (!form.isConnected) return;

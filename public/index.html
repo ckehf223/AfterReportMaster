@@ -4,15 +4,15 @@
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f6f5ee" />
+    <meta name="theme-color" content="#f9f8f0" />
     <meta
       name="description"
-      content="즐기삼 활동을 마치고 남기는 사후 보고입니다."
+      content="하나되어 즐기삼 주관자와 활동자의 사후 보고를 작성합니다."
     />
-    <title>즐기삼 | 활동 사후</title>
+    <title>하나되어 즐기삼</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&amp;display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@900&amp;display=swap" />
     <link rel="stylesheet" href="styles.css" />
     <script defer src="date-picker.js"></script>
     <script defer src="app.js"></script>
@@ -22,7 +22,7 @@
       <div class="shell header-content">
         <a href="./index.html" class="brand">
           <span class="brand-mark"><img src="assets/leaf.png" alt="" width="42" height="22" /></span>
-          <span>우리 모두 <strong>즐기삼</strong></span>
+          <strong>하나되어 즐기삼</strong>
         </a>
       </div>
     </header>
@@ -36,31 +36,30 @@
 
       <section id="cover" class="panel cover" aria-labelledby="cover-title">
         <div class="cover-copy">
-          <h1 id="cover-title" tabindex="-1">활동 사후 <span>보고</span></h1>
-          <p class="cover-description">역할을 선택해 오늘의 활동을 기록해 주세요.</p>
+          <p class="cover-purpose">활동 사후 보고</p>
+          <h1 id="cover-title" tabindex="-1">하나되어 <span>즐기삼</span></h1>
           <nav class="role-actions" aria-label="작성할 사후 보고">
             <button type="button" data-role="organizer" class="role-action" aria-labelledby="organizer-action" aria-describedby="organizer-details">
-              <span><strong id="organizer-action">주관자 사후</strong><small id="organizer-details">참여 인원과 전체 결과</small></span>
+              <strong id="organizer-action">주관자 사후</strong>
               <span class="role-arrow" aria-hidden="true">→</span>
+              <small id="organizer-details">참여 인원과 전체 결과</small>
             </button>
             <button type="button" data-role="participant" class="role-action" aria-labelledby="participant-action" aria-describedby="participant-details">
-              <span><strong id="participant-action">활동자 사후</strong><small id="participant-details">활동 시간과 체크리스트</small></span>
+              <strong id="participant-action">활동자 사후</strong>
               <span class="role-arrow" aria-hidden="true">→</span>
+              <small id="participant-details">활동 시간과 체크리스트</small>
             </button>
           </nav>
           <p id="role-status" class="role-status" role="status"></p>
         </div>
         <div class="cover-visual">
-          <img class="cover-image" src="assets/report-cover.webp" alt="" width="1122" height="1402" fetchpriority="high" />
+          <img class="cover-image" src="assets/together-cover.webp" alt="" width="1254" height="1254" fetchpriority="high" />
         </div>
       </section>
 
       <div id="report-view" hidden></div>
     </main>
 
-    <footer class="shell site-footer">
-      <span>© 2026 즐기삼</span>
-      <span lang="en">Have Fun, Sam!</span>
-    </footer>
+    <footer class="shell site-footer">© 2026 하나되어 즐기삼</footer>
   </body>
 </html>
