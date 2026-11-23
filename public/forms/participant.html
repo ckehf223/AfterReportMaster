@@ -37,8 +37,9 @@
             <option>그 외</option>
           </select>
         </label>
-        <fieldset class="time-field full">
+        <fieldset class="time-field full" aria-describedby="activity-time-guide">
           <legend>활동 시간 <span class="required" aria-hidden="true">*</span></legend>
+          <p class="time-guide" id="activity-time-guide">여러 구간에 활동했다면 ‘추가’를 눌러 각 시작·종료 시간을 입력해 주세요.</p>
           <div class="time-row time-row-with-action" data-time-row role="group" aria-label="활동 시간 구간">
             <label>시작시간 <input type="time" data-time-start required /></label>
             <span class="time-separator" aria-hidden="true">–</span>

@@ -36,23 +36,47 @@
           <div class="cover-inner">
             <p class="cover-purpose">활동 사후 보고</p>
             <h1 id="cover-title" tabindex="-1">하나되어 즐기삼</h1>
+            <p class="cover-description">활동일과 타임을 기준으로 주관자와 활동자의 기록을 정리해요.</p>
           </div>
         </div>
         <div class="role-band">
           <nav class="role-actions" aria-label="작성할 사후 보고">
-            <button type="button" data-role="organizer" class="role-action" aria-labelledby="organizer-action" aria-describedby="organizer-details">
-              <strong id="organizer-action">주관자 사후</strong>
-              <small id="organizer-details">참여 인원과 전체 결과</small>
-              <span class="role-arrow" aria-hidden="true">→</span>
-            </button>
-            <button type="button" data-role="participant" class="role-action" aria-labelledby="participant-action" aria-describedby="participant-details">
-              <strong id="participant-action">활동자 사후</strong>
-              <small id="participant-details">활동 시간과 체크리스트</small>
-              <span class="role-arrow" aria-hidden="true">→</span>
-            </button>
+            <article class="role-card organizer-card" aria-labelledby="organizer-action">
+              <h2 id="organizer-action">주관자 사후</h2>
+              <p>맡아서 운영한 타임의 기록을 남겨요.</p>
+              <ul class="role-fields">
+                <li>주관 시간</li><li>참여 인원</li><li>전체 찾기 건수</li>
+              </ul>
+              <button type="button" data-role="organizer" class="button role-action" aria-labelledby="organizer-action organizer-cta">
+                <span id="organizer-cta">작성하기</span><span class="role-arrow" aria-hidden="true">→</span>
+              </button>
+            </article>
+            <article class="role-card participant-card" aria-labelledby="participant-action">
+              <h2 id="participant-action">활동자 사후</h2>
+              <p>내가 참여한 구간과 활동 결과를 기록해요.</p>
+              <ul class="role-fields">
+                <li>활동 시간</li><li>체크리스트</li><li>본인 찾기 건수</li>
+              </ul>
+              <button type="button" data-role="participant" class="button role-action" aria-labelledby="participant-action participant-cta">
+                <span id="participant-cta">작성하기</span><span class="role-arrow" aria-hidden="true">→</span>
+              </button>
+            </article>
           </nav>
+          <p id="role-status" class="role-status" role="status"></p>
         </div>
-        <p id="role-status" class="shell role-status" role="status"></p>
+        <figure class="time-example">
+          <figcaption>활동 시간 입력 예시</figcaption>
+          <div class="example-row"><span>2타임 주관 시간</span><strong>15:00–18:30</strong></div>
+          <div class="example-track" aria-hidden="true"><span></span><span></span></div>
+          <div class="example-row">
+            <span>활동 시간</span>
+            <div class="example-intervals"><strong>15:00–16:00</strong><strong>17:00–18:00</strong></div>
+          </div>
+        </figure>
+        <aside class="report-guide" aria-labelledby="guide-title">
+          <h2 id="guide-title">작성 전 확인</h2>
+          <p>같은 활동의 보고서는 활동일과 타임을 맞춰 주세요. 활동자는 쉬는 시간을 빼고 각 구간을 추가해 주세요.</p>
+        </aside>
       </section>
 
       <div id="report-view" hidden></div>
