@@ -7,7 +7,12 @@ import {
 import { notionRequest } from '../lib/notion.mjs';
 
 const SLOTS = new Set(['1타임', '2타임', '3타임', '4타임', '그 외']);
+const LOCATIONS = new Set([
+  '강동', '건대', '광나루', '구리', '군자', '길동', '둔촌동', '미사',
+  '송파', '어린이대공원', '왕십리', '자양역', '잠실', '천호',
+]);
 const CLOCK_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const reportSchemas = new Map();
 const OMEGA3_ITEMS = [
   ['omega3AfterReport', '사후'],
   ['omega3Tm', '티엠'],
@@ -61,6 +66,45 @@ function block(type, value, options) {
   return { type, [type]: { ...richText(value), ...options } };
 }
 
+async function reportColumnNames(source, names, token) {
+  const path = `data_sources/${source}`;
+  let { properties } = await notionRequest(path, 'GET', undefined, token);
+  const missing = names.filter(name => !Object.hasOwn(properties, name));
+  if (missing.length) {
+    try {
+      ({ properties } = await notionRequest(path, 'PATCH', {
+        properties: Object.fromEntries(missing.map(name => [name, { rich_text: {} }])),
+      }, token));
+    } catch (error) {
+      if (error.notionStatus === 400 || error.notionStatus === 409) {
+        // Another invocation may have added the same columns after our read.
+        ({ properties } = await notionRequest(path, 'GET', undefined, token));
+      } else {
+        console.error('Could not add Notion report columns', error.notionStatus);
+      }
+    }
+  }
+  return names.filter(name => properties[name]?.type === 'rich_text');
+}
+
+async function reportProperties(source, timeColumn, timeRanges, location, token) {
+  if (!timeRanges) return {};
+
+  const names = [timeColumn, '활동 장소'];
+  const key = `${source}/${timeColumn}`;
+  if (!reportSchemas.has(key)) reportSchemas.set(key, reportColumnNames(source, names, token));
+
+  const columns = await reportSchemas.get(key).catch(() => []);
+  if (columns.length !== names.length) reportSchemas.delete(key);
+
+  // The report body also stores these values when the data source schema is read-only.
+  const values = {
+    [timeColumn]: timeRanges.map(({ start, end }) => `${start}-${end}`).join('\n'),
+    '활동 장소': location,
+  };
+  return Object.fromEntries(columns.filter(column => values[column]).map(column => [column, richText(values[column])]));
+}
+
 function omega3Details(input) {
   return [
     block('heading_2', '오메가-3'),
@@ -68,7 +112,7 @@ function omega3Details(input) {
   ];
 }
 
-function reportDetails(date, slot, roleLabel, timeRanges, name, results) {
+function reportDetails(date, slot, roleLabel, timeRanges, location, name, results) {
   const bullet = value => block('bulleted_list_item', value);
   const times = timeRanges?.map(({ start, end }) => `${start} - ${end}`).join('\n');
   return [
@@ -78,14 +122,15 @@ function reportDetails(date, slot, roleLabel, timeRanges, name, results) {
     bullet(`활동일: ${date}`),
     bullet(`${roleLabel} 타임: ${slot}`),
     ...(times ? [bullet(`${roleLabel} 시간: ${times}`)] : []),
+    ...(location ? [bullet(`활동 장소: ${location}`)] : []),
     bullet(`${roleLabel}자 이름: ${name}`),
     block('heading_3', '2️⃣ 활동 결과'),
     ...results.map(bullet),
   ];
 }
 
-function organizerDetails(date, slot, timeRanges, name, headcount, findings, changes, notes, omega3) {
-  const details = reportDetails(date, slot, '주관', timeRanges, name, [
+function organizerDetails(date, slot, timeRanges, location, name, headcount, findings, changes, notes, omega3) {
+  const details = reportDetails(date, slot, '주관', timeRanges, location, name, [
     `활동 인원수: ${headcount}명`, `전체 찾기 건수: ${findings}건`,
   ]);
   // Tag only our synced block so resubmissions never replace hand-written page sections.
@@ -107,10 +152,10 @@ function organizerDetails(date, slot, timeRanges, name, headcount, findings, cha
   ];
 }
 
-function participantDetails(date, slot, timeRanges, name, findings, scores, suggestions, omega3) {
+function participantDetails(date, slot, timeRanges, location, name, findings, scores, suggestions, omega3) {
   const questions = timeRanges ? SCORE_QUESTIONS : LEGACY_SCORE_QUESTIONS;
   return [
-    ...reportDetails(date, slot, '활동', timeRanges, name, [`찾기 건수: ${findings}건`]),
+    ...reportDetails(date, slot, '활동', timeRanges, location, name, [`찾기 건수: ${findings}건`]),
     block('bulleted_list_item', '체크리스트 내역', {
       children: questions.map((question, index) => {
         const example = timeRanges && index === 2 ? `\n${SCORE_EXAMPLE}` : '';
@@ -273,6 +318,7 @@ export default async function submit(request) {
   const date = text(input.date, 20);
   const slot = text(input.slot, 20);
   const name = text(input.name, 80);
+  const location = text(input.location, 40);
   const findings = count(input.findings);
   const organizer = input.role === 'organizer';
   const { timeRanges } = input;
@@ -284,8 +330,11 @@ export default async function submit(request) {
   if (!validDate(date) || !slotIsValid || !name || findings === null) {
     return reply(400, { error: '활동일, 타임, 성명과 찾기 건수를 확인해 주세요.' });
   }
+  if (input.location !== undefined && !LOCATIONS.has(location)) {
+    return reply(400, { error: '목록에서 활동 장소를 선택해 주세요.' });
+  }
   // Earlier form versions submit the original checklist without any time fields.
-  if (timeRanges !== undefined && (!Array.isArray(timeRanges) || !timeRanges.length ||
+  if ((timeRanges !== undefined || location) && (!Array.isArray(timeRanges) || !timeRanges.length ||
       (organizer && timeRanges.length !== 1) || !timeRanges.every(validTimeRange))) {
     const label = organizer ? '주관 시간' : '활동 시간';
     return reply(400, { error: `${label}을 확인해 주세요. 종료 시간은 시작 시간보다 늦어야 해요.` });
@@ -312,8 +361,11 @@ export default async function submit(request) {
       '주관자 제출 완료': { checkbox: true },
     };
     const omega3 = omega3Details(input);
-    const body = organizerDetails(date, slot, timeRanges, name, headcount, findings, changes, notes, omega3);
-    saveReport = sessionId => saveOrganizerReport(sessionId, properties, body, token);
+    const body = organizerDetails(date, slot, timeRanges, location, name, headcount, findings, changes, notes, omega3);
+    saveReport = async sessionId => {
+      const metadata = await reportProperties(sessionsSource, '주관 시간', timeRanges, location, token);
+      await saveOrganizerReport(sessionId, { ...properties, ...metadata }, body, token);
+    };
   } else {
     const scores = SCORE_PROPERTIES.map((_, index) => count(input[`score${index + 1}`]));
     if (scores.some(score => score === null || score < 1 || score > 5)) {
@@ -324,17 +376,21 @@ export default async function submit(request) {
     );
     const suggestions = text(input.suggestions, 1500);
     const omega3 = omega3Details(input);
-    saveReport = sessionId => notionRequest('pages', 'POST', {
-      parent: { type: 'data_source_id', data_source_id: participantsSource },
-      properties: {
-        title: { title: [{ text: { content: name } }] },
-        '타임': { relation: [{ id: sessionId }] },
-        '본인 찾기 건수': { number: findings },
-        '건의사항': richText(suggestions),
-        ...scoreValues,
-      },
-      children: participantDetails(date, slot, timeRanges, name, findings, scores, suggestions, omega3),
-    }, token);
+    saveReport = async sessionId => {
+      const metadata = await reportProperties(participantsSource, '활동 시간', timeRanges, location, token);
+      await notionRequest('pages', 'POST', {
+        parent: { type: 'data_source_id', data_source_id: participantsSource },
+        properties: {
+          title: { title: [{ text: { content: name } }] },
+          '타임': { relation: [{ id: sessionId }] },
+          '본인 찾기 건수': { number: findings },
+          '건의사항': richText(suggestions),
+          ...scoreValues,
+          ...metadata,
+        },
+        children: participantDetails(date, slot, timeRanges, location, name, findings, scores, suggestions, omega3),
+      }, token);
+    };
   }
 
   const key = `${date} | ${slot}`;

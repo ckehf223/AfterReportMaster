@@ -423,7 +423,12 @@ h1[tabindex="-1"]:focus-visible { outline: none; }
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 19px 16px;
 }
-.full { grid-column: 1 / -1; }
+.full, .activity-location { grid-column: 1 / -1; }
+
+@media (min-width: 760px) {
+  .activity-fields { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .activity-location { grid-column: auto; }
+}
 
 .fields > label, .date-field > label, .time-field legend, .time-row label {
   display: block;

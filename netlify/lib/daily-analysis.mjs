@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { getStore } from '@netlify/blobs';
+import { ACTIVITY_JOURNAL_TITLE, formatActivityJournal, saveActivityJournal } from './activity-journal.mjs';
 import { notionRequest } from './notion.mjs';
 
 // The existing Notion columns store scores by position across checklist revisions.
@@ -144,9 +145,9 @@ export function organizerResponses(participants) {
   return groups.map(richText => ({ type: 'paragraph', paragraph: { rich_text: richText } }));
 }
 
-async function updateOrganizerResponses(notion, session, participants) {
+async function readOrganizerReport(notion, sessionId) {
   const wrapperIds = [];
-  for await (const block of childBlocks(notion, session.id)) {
+  for await (const block of childBlocks(notion, sessionId)) {
     if (block.type === 'synced_block' && block.synced_block.synced_from === null && block.has_children) {
       wrapperIds.push(block.id);
     }
@@ -155,31 +156,33 @@ async function updateOrganizerResponses(notion, session, participants) {
   for (const wrapperId of wrapperIds.reverse()) {
     const blocks = [];
     for await (const block of childBlocks(notion, wrapperId)) blocks.push(block);
-    if (!blocks[0]?.heading_2?.rich_text.some(item => item.href === ORGANIZER_BODY_MARKER)) continue;
-    const existing = blocks.filter(block => block.paragraph?.rich_text[0]?.href === RESPONSES_MARKER);
-    const updated = organizerResponses(participants);
-    for (const [index, { paragraph }] of updated.slice(0, existing.length).entries()) {
-      const oldBlock = existing[index];
-      const displayed = oldBlock.paragraph.rich_text.map(item => [item.plain_text, item.href ?? null]);
-      const next = paragraph.rich_text.map(item => [item.text.content, item.text.link?.url ?? null]);
-      if (JSON.stringify(displayed) !== JSON.stringify(next)) {
-        await notion(`blocks/${oldBlock.id}`, 'PATCH', { paragraph });
-      }
+    if (blocks[0]?.heading_2?.rich_text.some(item => item.href === ORGANIZER_BODY_MARKER)) return { wrapperId, blocks };
+  }
+}
+
+async function updateOrganizerResponses(notion, { wrapperId, blocks }, participants) {
+  const existing = blocks.filter(block => block.paragraph?.rich_text[0]?.href === RESPONSES_MARKER);
+  const updated = organizerResponses(participants);
+  for (const [index, { paragraph }] of updated.slice(0, existing.length).entries()) {
+    const oldBlock = existing[index];
+    const displayed = oldBlock.paragraph.rich_text.map(item => [item.plain_text, item.href ?? null]);
+    const next = paragraph.rich_text.map(item => [item.text.content, item.text.link?.url ?? null]);
+    if (JSON.stringify(displayed) !== JSON.stringify(next)) {
+      await notion(`blocks/${oldBlock.id}`, 'PATCH', { paragraph });
     }
-    const heading = blocks.find(block => block.heading_2?.rich_text[0]?.plain_text === '활동자 사후내역');
-    const missing = updated.slice(existing.length);
-    let after = existing.at(-1)?.id ?? heading?.id;
-    for (let index = 0; after && index < missing.length; index += 100) {
-      const added = await notion(`blocks/${wrapperId}/children`, 'PATCH', {
-        position: { type: 'after_block', after_block: { id: after } },
-        children: missing.slice(index, index + 100),
-      });
-      after = added.results.at(-1)?.id;
-    }
-    for (const stale of existing.slice(updated.length)) {
-      await notion(`blocks/${stale.id}`, 'PATCH', { in_trash: true });
-    }
-    return;
+  }
+  const heading = blocks.find(block => block.heading_2?.rich_text[0]?.plain_text === '활동자 사후내역');
+  const missing = updated.slice(existing.length);
+  let after = existing.at(-1)?.id ?? heading?.id;
+  for (let index = 0; after && index < missing.length; index += 100) {
+    const added = await notion(`blocks/${wrapperId}/children`, 'PATCH', {
+      position: { type: 'after_block', after_block: { id: after } },
+      children: missing.slice(index, index + 100),
+    });
+    after = added.results.at(-1)?.id;
+  }
+  for (const stale of existing.slice(updated.length)) {
+    await notion(`blocks/${stale.id}`, 'PATCH', { in_trash: true });
   }
 }
 
@@ -242,18 +245,37 @@ export async function updateDailyAnalysis(date, sessionIds, env = process.env) {
       bySession.get(id).push(participant);
     }
   }
+  const organizerReports = new Map();
+  async function getOrganizerReport(sessionId) {
+    if (!organizerReports.has(sessionId)) organizerReports.set(sessionId, await readOrganizerReport(notion, sessionId));
+    return organizerReports.get(sessionId);
+  }
   for (const session of sessions) {
     if (sessionIds.has(session.id) && value(session, '주관자 제출 완료', 'checkbox')) {
-      await updateOrganizerResponses(notion, session, bySession.get(session.id) ?? []);
+      const report = await getOrganizerReport(session.id);
+      if (report) await updateOrganizerResponses(notion, report, bySession.get(session.id) ?? []);
     }
   }
   if (!env.NOTION_DAILY_ANALYSIS_PAGE_ID) return;
   const stats = collectDailyStats(sessions, uniqueParticipants);
 
   const parent = env.NOTION_DAILY_ANALYSIS_PAGE_ID;
+  const childrenOf = pageId => childBlocks(notion, pageId);
   const matching = [];
-  for await (const block of childBlocks(notion, parent)) {
-    if (block.type === 'child_page' && block.child_page.title === date) matching.push(block.id);
+  const journals = [];
+  for await (const block of childrenOf(parent)) {
+    if (block.type !== 'child_page') continue;
+    if (block.child_page.title === date) matching.push(block.id);
+    if (block.child_page.title === ACTIVITY_JOURNAL_TITLE) journals.push(block.id);
+  }
+  let journalError;
+  try {
+    if (journals.length > 1) throw new Error('Multiple activity journal parent pages have the same title');
+    const readOrganizerDetails = async sessionId => (await getOrganizerReport(sessionId))?.blocks ?? [];
+    const content = await formatActivityJournal(sessions, bySession, readOrganizerDetails, childrenOf);
+    await saveActivityJournal(notion, childrenOf, parent, journals[0], date, content);
+  } catch (error) {
+    journalError = error;
   }
   if (matching.length > 1) throw new Error('Multiple daily pages have the same date');
 
@@ -268,6 +290,7 @@ export async function updateDailyAnalysis(date, sessionIds, env = process.env) {
     }
   }
   await saveDateAnalysis(notion, parent, date, matching[0], analysisBlock(stats, analysis, sessions, uniqueParticipants));
+  if (journalError) throw journalError;
   if (aiError) throw aiError;
   return { waitingForAI: aiEnabled && !env.ANTHROPIC_API_KEY };
 }

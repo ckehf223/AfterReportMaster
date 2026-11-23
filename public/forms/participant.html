@@ -8,7 +8,7 @@
   <form id="report-form" method="post" data-role="participant">
     <fieldset class="form-section">
       <legend>활동 정보</legend>
-      <div class="fields">
+      <div class="fields activity-fields">
         <div class="date-field">
           <label for="activity-date"
             >활동일 <span class="required" aria-hidden="true">*</span></label
@@ -35,6 +35,25 @@
             <option>3타임</option>
             <option>4타임</option>
             <option>그 외</option>
+          </select>
+        </label>
+        <label class="activity-location">활동 장소 <span class="required" aria-hidden="true">*</span>
+          <select name="location" required>
+            <option value="">장소를 선택해 주세요</option>
+            <option>강동</option>
+            <option>건대</option>
+            <option>광나루</option>
+            <option>구리</option>
+            <option>군자</option>
+            <option>길동</option>
+            <option>둔촌동</option>
+            <option>미사</option>
+            <option>송파</option>
+            <option>어린이대공원</option>
+            <option>왕십리</option>
+            <option>자양역</option>
+            <option>잠실</option>
+            <option>천호</option>
           </select>
         </label>
         <fieldset class="time-field full" aria-describedby="activity-time-guide">
