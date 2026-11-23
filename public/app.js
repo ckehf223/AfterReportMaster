@@ -1,5 +1,6 @@
 const cover = document.querySelector('#cover');
 const reportView = document.querySelector('#report-view');
+const siteHeader = document.querySelector('.site-header');
 const roleStatus = document.querySelector('#role-status');
 const steps = [...document.querySelectorAll('[data-step]')];
 const roles = { organizer: '주관자', participant: '활동자' };
@@ -61,6 +62,7 @@ function setupTimeRanges(timeField) {
 function mountScreen(role, content) {
   const hasRole = Boolean(content);
   cover.hidden = hasRole;
+  siteHeader.hidden = !hasRole;
   reportView.hidden = !hasRole;
   reportView.replaceChildren();
   document.title = hasRole ? brandTitle + ' | ' + roles[role] + ' 사후' : brandTitle;

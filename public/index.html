@@ -4,7 +4,7 @@
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#fafbfc" />
+    <meta name="theme-color" content="#121c31" />
     <meta
       name="description"
       content="하나되어 즐기삼 주관자와 활동자의 사후 보고를 작성합니다."
@@ -18,7 +18,7 @@
     <script defer src="app.js"></script>
   </head>
   <body>
-    <header class="site-header">
+    <header class="site-header" hidden>
       <div class="shell header-content">
         <a href="./index.html" class="brand">하나되어 즐기삼</a>
         <ol class="steps" aria-label="진행 단계">
@@ -29,25 +29,30 @@
       </div>
     </header>
 
-    <main class="shell">
+    <main>
       <section id="cover" class="cover" aria-labelledby="cover-title">
         <div class="cover-copy">
-          <p class="cover-purpose">활동 사후 보고</p>
-          <h1 id="cover-title" tabindex="-1">하나되어 즐기삼</h1>
+          <div class="studio-lines" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="cover-inner">
+            <p class="cover-purpose">활동 사후 보고</p>
+            <h1 id="cover-title" tabindex="-1">하나되어 즐기삼</h1>
+          </div>
         </div>
-        <nav class="role-actions" aria-label="작성할 사후 보고">
-          <button type="button" data-role="organizer" class="role-action" aria-labelledby="organizer-action" aria-describedby="organizer-details">
-            <strong id="organizer-action">주관자 사후</strong>
-            <small id="organizer-details">참여 인원과 전체 결과</small>
-            <span class="role-arrow" aria-hidden="true">→</span>
-          </button>
-          <button type="button" data-role="participant" class="role-action" aria-labelledby="participant-action" aria-describedby="participant-details">
-            <strong id="participant-action">활동자 사후</strong>
-            <small id="participant-details">활동 시간과 체크리스트</small>
-            <span class="role-arrow" aria-hidden="true">→</span>
-          </button>
-        </nav>
-        <p id="role-status" class="role-status" role="status"></p>
+        <div class="role-band">
+          <nav class="role-actions" aria-label="작성할 사후 보고">
+            <button type="button" data-role="organizer" class="role-action" aria-labelledby="organizer-action" aria-describedby="organizer-details">
+              <strong id="organizer-action">주관자 사후</strong>
+              <small id="organizer-details">참여 인원과 전체 결과</small>
+              <span class="role-arrow" aria-hidden="true">→</span>
+            </button>
+            <button type="button" data-role="participant" class="role-action" aria-labelledby="participant-action" aria-describedby="participant-details">
+              <strong id="participant-action">활동자 사후</strong>
+              <small id="participant-details">활동 시간과 체크리스트</small>
+              <span class="role-arrow" aria-hidden="true">→</span>
+            </button>
+          </nav>
+        </div>
+        <p id="role-status" class="shell role-status" role="status"></p>
       </section>
 
       <div id="report-view" hidden></div>
