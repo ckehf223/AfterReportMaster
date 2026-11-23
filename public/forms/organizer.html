@@ -1,12 +1,11 @@
 <section id="form" class="panel form-panel" aria-labelledby="form-title">
   <div class="form-intro">
-    <p class="eyebrow">활동 기록</p>
     <h1 id="form-title" tabindex="-1">주관자 사후 보고</h1>
-    <p>해당 활동을 선택한 뒤, 아래 항목을 작성해 주세요.</p>
+    <p>주관한 타임과 활동 결과를 기록해 주세요.</p>
   </div>
   <form id="report-form" method="post" data-role="organizer">
     <fieldset class="form-section">
-      <legend><span>01</span> 활동 정보</legend>
+      <legend>활동 정보</legend>
       <div class="fields">
         <div class="date-field">
           <label for="activity-date">활동일 <span class="required" aria-hidden="true">*</span></label>
@@ -31,7 +30,7 @@
     </fieldset>
 
     <fieldset class="form-section">
-      <legend><span>02</span> 활동 결과</legend>
+      <legend>활동 결과</legend>
       <div class="fields">
         <label>활동 인원 수 <span class="required" aria-hidden="true">*</span><input type="number" name="headcount" min="0" step="1" inputmode="numeric" placeholder="명" required></label>
         <label>전체 찾기 건수 <span class="required" aria-hidden="true">*</span><input type="number" name="findings" min="0" step="1" inputmode="numeric" placeholder="건" required></label>
@@ -41,7 +40,7 @@
     </fieldset>
 
     <fieldset class="form-section" aria-describedby="omega3-help">
-      <legend><span>03</span> 오메가-3</legend>
+      <legend>오메가-3</legend>
       <p id="omega3-help" class="checklist-guide">완료한 항목에 체크해 주세요.</p>
       <div class="checklist-options">
         <label><input type="checkbox" name="omega3AfterReport"> 사후</label>
@@ -57,7 +56,6 @@
 
 <section id="done" class="panel ending" aria-labelledby="done-title" hidden>
   <div class="check" aria-hidden="true">✓</div>
-  <p class="eyebrow">기록 완료</p>
   <h1 id="done-title" tabindex="-1">제출이 완료됐어요</h1>
   <p>오늘의 활동을 기록해 주셔서 감사합니다.</p>
   <p id="receipt" class="receipt"></p>

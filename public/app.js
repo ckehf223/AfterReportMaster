@@ -1,6 +1,5 @@
 const cover = document.querySelector('#cover');
 const reportView = document.querySelector('#report-view');
-const badge = document.querySelector('#report-role');
 const roleStatus = document.querySelector('#role-status');
 const steps = [...document.querySelectorAll('[data-step]')];
 const roles = { organizer: '주관자', participant: '활동자' };
@@ -11,7 +10,7 @@ function focusScreen(section, step) {
     if (item.dataset.step === step) item.setAttribute('aria-current', 'step');
     else item.removeAttribute('aria-current');
   }
-  section.querySelector('h1, h3').focus({ preventScroll: true });
+  section.querySelector('h1').focus({ preventScroll: true });
   window.scrollTo(0, 0);
 }
 
@@ -63,7 +62,6 @@ function mountScreen(role, content) {
   cover.hidden = hasRole;
   reportView.hidden = !hasRole;
   reportView.replaceChildren();
-  badge.textContent = hasRole ? roles[role] + '용' : '활동 기록';
   document.title = hasRole ? '즐기삼 | ' + roles[role] + ' 사후' : '즐기삼 | 활동 사후';
 
   if (!hasRole) {
