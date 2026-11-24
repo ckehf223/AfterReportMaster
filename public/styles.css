@@ -612,20 +612,16 @@ textarea { resize: vertical; line-height: 1.6; }
   word-break: keep-all;
 }
 
-.rating-example {
-  margin: 3px 0 0;
-  color: var(--muted);
-  font-size: .8rem;
-  line-height: 1.55;
-}
-
 .score-options {
   display: grid;
   max-width: 330px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   gap: 7px;
   margin-top: 9px;
 }
+
+.binary-options { max-width: 220px; }
 
 .score-options label { position: relative; cursor: pointer; }
 

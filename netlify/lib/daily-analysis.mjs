@@ -2,9 +2,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import { getStore } from '@netlify/blobs';
 import { ACTIVITY_JOURNAL_TITLE, formatActivityJournal, saveActivityJournal } from './activity-journal.mjs';
 import { notionRequest } from './notion.mjs';
+import { CURRENT_SCORE_PROPERTIES, SCORE_PROPERTIES } from './report-checklist.mjs';
 
-// The existing Notion columns store scores by position across checklist revisions.
-export const SCORE_PROPERTIES = ['활동 이해', '안내 준수', '활동 범위 확인', '찾기 기록'];
+export { SCORE_PROPERTIES };
+
+const LEGACY_CHECKLIST = { properties: SCORE_PROPERTIES, maximum: 5 };
+const CURRENT_CHECKLIST = { properties: CURRENT_SCORE_PROPERTIES, maximum: 3 };
 const TOPICS = [
   ['집결·장소 안내', /집결|장소|위치|길 안내|주소/],
   ['시간·일정', /지연|늦|일정|시간|연기/],
@@ -38,6 +41,27 @@ const value = (page, name, type) => page.properties[name]?.[type];
 const plain = (page, name) => (value(page, name, 'rich_text') ?? []).map(item => item.plain_text).join('');
 const number = (page, name) => value(page, name, 'number') ?? null;
 const average = values => values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length * 100) / 100 : null;
+const remarks = page => plain(page, '비고').trim() || plain(page, '건의사항').trim();
+
+function checklistFor(page) {
+  return CURRENT_SCORE_PROPERTIES.some(property => number(page, property) !== null)
+    ? CURRENT_CHECKLIST
+    : LEGACY_CHECKLIST;
+}
+
+function checklistScore(page, property, maximum) {
+  const score = number(page, property);
+  return Number.isInteger(score) && score >= 1 && score <= maximum ? score : null;
+}
+
+function checklistAverages(participants, { properties, maximum }) {
+  const scores = properties.map(property => participants.map(page => checklistScore(page, property, maximum))
+    .filter(score => score !== null));
+  return {
+    overall: average(scores.flat()),
+    byQuestion: Object.fromEntries(scores.map((values, index) => [`${index + 1}번`, average(values)])),
+  };
+}
 
 function countTopics(notes) {
   const counts = {};
@@ -51,8 +75,9 @@ function countTopics(notes) {
 
 export function collectDailyStats(sessions, participants) {
   const organizers = sessions.filter(page => value(page, '주관자 제출 완료', 'checkbox'));
-  const scores = SCORE_PROPERTIES.map(property => participants.map(page => number(page, property))
-    .filter(score => Number.isInteger(score) && score >= 1 && score <= 5));
+  const byChecklist = Map.groupBy(participants, checklistFor);
+  const legacyScores = checklistAverages(byChecklist.get(LEGACY_CHECKLIST) ?? [], LEGACY_CHECKLIST);
+  const currentScores = checklistAverages(byChecklist.get(CURRENT_CHECKLIST) ?? [], CURRENT_CHECKLIST);
   const sum = (pages, name) => {
     const values = pages.map(page => number(page, name)).filter(Number.isFinite);
     return values.length ? values.reduce((a, b) => a + b, 0) : null;
@@ -64,11 +89,13 @@ export function collectDailyStats(sessions, participants) {
     organizerFindings: sum(organizers, '전체 찾기 건수'),
     participants: participants.length,
     participantFindings: sum(participants, '본인 찾기 건수'),
-    scoreAverage: average(scores.flat()),
-    questionAverages: Object.fromEntries(scores.map((values, i) => [`${i + 1}번`, average(values)])),
+    scoreAverage: legacyScores.overall,
+    questionAverages: legacyScores.byQuestion,
+    currentScoreAverage: currentScores.overall,
+    currentQuestionAverages: currentScores.byQuestion,
     organizerIssues: countTopics(organizers.map(page => plain(page, '변경·지연·누락 사유'))),
     organizerNotes: countTopics(organizers.map(page => plain(page, '특이사항'))),
-    participantSuggestions: countTopics(participants.map(page => plain(page, '건의사항'))),
+    participantSuggestions: countTopics(participants.map(remarks)),
   };
 }
 
@@ -108,7 +135,7 @@ async function analyze(stats, env) {
     body: JSON.stringify({
       model: 'claude-haiku-4-5',
       max_tokens: 450,
-      system: '즐기삼 활동의 일별 집계와 주제 분류를 읽고, 확인된 경향과 다음 회차에서 확인할 사항을 한국어 3문장 이내로 작성하세요. 미제출과 0을 구별하세요. 주관자 전체 찾기와 활동자 본인 찾기를 더하지 마세요. 주제는 키워드 분류이므로 사건의 상세 내용이나 원인을 추측하지 마세요. 근거가 부족하면 그 사실을 적으세요.',
+      system: '즐기삼 활동의 일별 집계와 주제 분류를 읽고, 확인된 경향과 다음 회차에서 확인할 사항을 한국어 3문장 이내로 작성하세요. 미제출과 0을 구별하세요. 주관자 전체 찾기와 활동자 본인 찾기를 더하지 마세요. 기존 5점 척도와 현재 3점 척도의 체크리스트 평균은 각각 해석하세요. 주제는 키워드 분류이므로 사건의 상세 내용이나 원인을 추측하지 마세요. 근거가 부족하면 그 사실을 적으세요.',
       messages: [{ role: 'user', content: JSON.stringify(stats) }],
     }),
     signal: AbortSignal.timeout(9000),
@@ -130,15 +157,16 @@ export function organizerResponses(participants) {
     const title = Object.values(page.properties).find(property => property.type === 'title');
     const name = title?.title.map(item => item.plain_text).join('') || '활동자 응답';
     const findings = number(page, '본인 찾기 건수');
-    const scores = SCORE_PROPERTIES.map((property, index) => {
-      const score = number(page, property);
-      return `${index + 1}번 ${score >= 1 && score <= 5 ? `${score}/5` : '미응답'}`;
+    const { properties, maximum } = checklistFor(page);
+    const scores = properties.map((property, index) => {
+      const score = checklistScore(page, property, maximum);
+      return `${index + 1}번 ${score === null ? '미응답' : `${score}/${maximum}`}`;
     }).join(' · ');
-    const suggestions = plain(page, '건의사항').trim().slice(0, 1500) || '없음';
+    const note = remarks(page).slice(0, 1500) || '없음';
     const details = [
       `본인 찾기 ${findings === null ? '미입력' : `${findings}건`}`,
       `체크리스트 · ${scores}`,
-      `건의사항 · ${suggestions}`,
+      `비고 · ${note}`,
     ].join('\n');
     groups.at(-1).push(text(`\n\n• ${name.slice(0, 160)}`, page.url), text(`\n${details}`));
   }
@@ -188,13 +216,21 @@ async function updateOrganizerResponses(notion, { wrapperId, blocks }, participa
 
 function analysisBlock(stats, analysis, sessions, participants) {
   const unit = (count, suffix) => count === null ? '미집계' : `${count}${suffix}`;
-  const questions = Object.entries(stats.questionAverages).map(([key, score]) =>
-    `${key} ${unit(score, '/5')}`).join(' · ');
+  const checklist = (score, averages, maximum) => {
+    const suffix = `/${maximum}`;
+    const questions = Object.entries(averages).map(([key, value]) => `${key} ${unit(value, suffix)}`).join(' · ');
+    return `체크리스트 평균 (${maximum}점 척도) ${unit(score, suffix)}\n${questions}`;
+  };
   const totals = [
     `타임 ${stats.sessions}개 · 주관자 제출 ${stats.organizers}건 · 활동자 응답 ${stats.participants}건`,
     `실제 참여 ${unit(stats.headcount, '명')} · 주관자 전체 찾기 ${unit(stats.organizerFindings, '건')} · 활동자 본인 찾기 ${unit(stats.participantFindings, '건')}`,
-    `체크리스트 평균 ${unit(stats.scoreAverage, '/5')}\n${questions}`,
   ];
+  if (stats.scoreAverage !== null || stats.currentScoreAverage === null) {
+    totals.push(checklist(stats.scoreAverage, stats.questionAverages, LEGACY_CHECKLIST.maximum));
+  }
+  if (stats.currentScoreAverage !== null) {
+    totals.push(checklist(stats.currentScoreAverage, stats.currentQuestionAverages, CURRENT_CHECKLIST.maximum));
+  }
   const sources = [
     ...sessions.map(page => [page, '타임']),
     ...participants.map(page => [page, '활동자 응답']),
@@ -212,7 +248,7 @@ function topicSummary(stats, aiEnabled) {
   const groups = [
     ['변경·지연·누락 사유', stats.organizerIssues],
     ['주관자 특이사항', stats.organizerNotes],
-    ['활동자 건의사항', stats.participantSuggestions],
+    ['활동자 비고', stats.participantSuggestions],
   ];
   return [
     aiEnabled ? 'AI 해석 연결 대기 · 제출 내용의 키워드 분류입니다.' : '제출 내용의 키워드 분류',

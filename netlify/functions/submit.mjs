@@ -2,9 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { setTimeout as wait } from 'node:timers/promises';
 import { getStore } from '@netlify/blobs';
 import {
-  organizerResponses, ORGANIZER_BODY_MARKER, queueDailyAnalysis, SCORE_PROPERTIES,
+  organizerResponses, ORGANIZER_BODY_MARKER, queueDailyAnalysis,
 } from '../lib/daily-analysis.mjs';
 import { notionRequest } from '../lib/notion.mjs';
+import { CURRENT_SCORE_PROPERTIES, SCORE_PROPERTIES } from '../lib/report-checklist.mjs';
 
 const SLOTS = new Set(['1타임', '2타임', '3타임', '4타임', '그 외']);
 const LOCATIONS = new Set([
@@ -12,6 +13,7 @@ const LOCATIONS = new Set([
   '송파', '어린이대공원', '왕십리', '자양역', '잠실', '천호',
 ]);
 const CLOCK_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+const REPORT_VERSION = '3';
 const reportSchemas = new Map();
 const OMEGA3_ITEMS = [
   ['omega3AfterReport', '사후'],
@@ -31,6 +33,19 @@ const SCORE_QUESTIONS = [
   '찾은 내용을 빠짐없이 기록했다.',
 ];
 const SCORE_EXAMPLE = '*Ex) 자가피드백(잘한 점,부족한 점, 개선할 점과 실행할 점)';
+const CURRENT_SCORE_QUESTIONS = [
+  '나는 긍정적, 할 수 있다는 마음으로 뛰었는가?',
+  '혼자 다니지 않고 같이 활동했는가?',
+  '옆사람을 독려했는가?',
+  '목표건을 도달했는가?',
+];
+const SCORE_LABELS = ['아니다', '때때로', '그렇다'];
+const ORGANIZER_QUESTIONS = [
+  ['묵상 말씀 준비', '묵상 말씀 준비를 하였는가?'],
+  ['인원 목표 확인', '인원 목표를 확인했는가?'],
+  ['분위기 살피며 독려', '분위기를 살펴보며 독려하였는가?'],
+  ['2인 1조 짝짓기', '2인 1조 짝을 잘 지었는가?'],
+];
 const SESSION_RESERVATION_MS = 90_000;
 const SESSION_WAIT_MS = 15_000;
 
@@ -66,15 +81,22 @@ function block(type, value, options) {
   return { type, [type]: { ...richText(value), ...options } };
 }
 
-async function reportColumnNames(source, names, token) {
+const bullet = value => block('bulleted_list_item', value);
+
+async function reportColumnNames(source, types, token) {
   const path = `data_sources/${source}`;
   let { properties } = await notionRequest(path, 'GET', undefined, token);
-  const missing = names.filter(name => !Object.hasOwn(properties, name));
+  const missing = Object.entries(types).filter(([name]) => !Object.hasOwn(properties, name));
+  const changes = Object.fromEntries(missing.map(([name, type]) => [name, { [type]: {} }]));
+  const formerRemarks = properties['건의사항'];
+  if (changes['비고'] && formerRemarks?.type === 'rich_text') {
+    // Rename the original column by ID so existing remarks and view settings stay attached.
+    delete changes['비고'];
+    changes[formerRemarks.id ?? '건의사항'] = { name: '비고' };
+  }
   if (missing.length) {
     try {
-      ({ properties } = await notionRequest(path, 'PATCH', {
-        properties: Object.fromEntries(missing.map(name => [name, { rich_text: {} }])),
-      }, token));
+      ({ properties } = await notionRequest(path, 'PATCH', { properties: changes }, token));
     } catch (error) {
       if (error.notionStatus === 400 || error.notionStatus === 409) {
         // Another invocation may have added the same columns after our read.
@@ -84,25 +106,34 @@ async function reportColumnNames(source, names, token) {
       }
     }
   }
-  return names.filter(name => properties[name]?.type === 'rich_text');
+  return Object.fromEntries(Object.entries(types).flatMap(([name, type]) => {
+    if (properties[name]?.type === type) return [[name, name]];
+    if (name === '비고' && properties['건의사항']?.type === type) {
+      return [[name, properties['건의사항'].id ?? '건의사항']];
+    }
+    return [];
+  }));
 }
 
-async function reportProperties(source, timeColumn, timeRanges, location, token) {
+function timeAndLocationProperties(timeColumn, timeRanges, location) {
   if (!timeRanges) return {};
-
-  const names = [timeColumn, '활동 장소'];
-  const key = `${source}/${timeColumn}`;
-  if (!reportSchemas.has(key)) reportSchemas.set(key, reportColumnNames(source, names, token));
-
-  const columns = await reportSchemas.get(key).catch(() => []);
-  if (columns.length !== names.length) reportSchemas.delete(key);
-
-  // The report body also stores these values when the data source schema is read-only.
-  const values = {
-    [timeColumn]: timeRanges.map(({ start, end }) => `${start}-${end}`).join('\n'),
-    '활동 장소': location,
+  return {
+    [timeColumn]: richText(timeRanges.map(({ start, end }) => `${start}-${end}`).join('\n')),
+    ...(location && { '활동 장소': richText(location) }),
   };
-  return Object.fromEntries(columns.filter(column => values[column]).map(column => [column, richText(values[column])]));
+}
+
+async function reportProperties(source, values, token) {
+  const entries = Object.entries(values);
+  if (!entries.length) return {};
+
+  const types = Object.fromEntries(entries.map(([name, value]) => [name, Object.keys(value)[0]]));
+  const key = `${source}/${JSON.stringify(types)}`;
+  if (!reportSchemas.has(key)) reportSchemas.set(key, reportColumnNames(source, types, token));
+
+  const columns = await reportSchemas.get(key).catch(() => ({}));
+  if (entries.some(([name]) => columns[name] !== name)) reportSchemas.delete(key);
+  return Object.fromEntries(Object.entries(columns).map(([name, column]) => [column, values[name]]));
 }
 
 function omega3Details(input) {
@@ -112,8 +143,7 @@ function omega3Details(input) {
   ];
 }
 
-function reportDetails(date, slot, roleLabel, timeRanges, location, name, results) {
-  const bullet = value => block('bulleted_list_item', value);
+function reportDetails({ date, slot, timeRanges, location, name }, roleLabel) {
   const times = timeRanges?.map(({ start, end }) => `${start} - ${end}`).join('\n');
   return [
     block('heading_2', '상세내역'),
@@ -124,24 +154,39 @@ function reportDetails(date, slot, roleLabel, timeRanges, location, name, result
     ...(times ? [bullet(`${roleLabel} 시간: ${times}`)] : []),
     ...(location ? [bullet(`활동 장소: ${location}`)] : []),
     bullet(`${roleLabel}자 이름: ${name}`),
-    block('heading_3', '2️⃣ 활동 결과'),
-    ...results.map(bullet),
   ];
 }
 
-function organizerDetails(date, slot, timeRanges, location, name, headcount, findings, changes, notes, omega3) {
-  const details = reportDetails(date, slot, '주관', timeRanges, location, name, [
-    `활동 인원수: ${headcount}명`, `전체 찾기 건수: ${findings}건`,
-  ]);
+function organizerDetails(report, { headcount, findings, changes, notes, omega3, potionName, checklist }) {
+  const details = reportDetails(report, '주관');
   // Tag only our synced block so resubmissions never replace hand-written page sections.
   details[0].heading_2.rich_text.push({
     type: 'text', text: { content: '\u2063', link: { url: ORGANIZER_BODY_MARKER } },
   });
+
+  if (checklist) {
+    if (potionName) details.push(bullet(`물약 포지션: ${potionName}`));
+    return [
+      ...details,
+      block('heading_3', '2️⃣ 체크리스트'),
+      ...ORGANIZER_QUESTIONS.map(([, question], index) => bullet(`${question} · ${checklist[index]}`)),
+      block('heading_3', '3️⃣ 활동 결과'),
+      bullet(`활동자 수: ${headcount}명`),
+      bullet(`찾기 건수: ${findings}건`),
+      bullet(`특이사항: ${notes || '없습니다.'}`),
+      block('heading_2', '활동자 사후내역'),
+      ...organizerResponses([]),
+    ];
+  }
+
   const noteSection = (title, value) => block('heading_3', title, {
     is_toggleable: true, children: [block('paragraph', value || '없습니다.')],
   });
   return [
     ...details,
+    block('heading_3', '2️⃣ 활동 결과'),
+    bullet(`활동 인원수: ${headcount}명`),
+    bullet(`전체 찾기 건수: ${findings}건`),
     block('heading_2', '활동 변경 지연/누락 사유'),
     { type: 'divider', divider: {} },
     noteSection('활동 변경 지연/누락 사유', changes),
@@ -152,17 +197,22 @@ function organizerDetails(date, slot, timeRanges, location, name, headcount, fin
   ];
 }
 
-function participantDetails(date, slot, timeRanges, location, name, findings, scores, suggestions, omega3) {
-  const questions = timeRanges ? SCORE_QUESTIONS : LEGACY_SCORE_QUESTIONS;
+function participantDetails(report, { findings, scores, remarks, omega3, current }) {
+  const questions = current ? CURRENT_SCORE_QUESTIONS : (report.timeRanges ? SCORE_QUESTIONS : LEGACY_SCORE_QUESTIONS);
+  const remarksLabel = current ? '비고' : '건의사항';
   return [
-    ...reportDetails(date, slot, '활동', timeRanges, location, name, [`찾기 건수: ${findings}건`]),
+    ...reportDetails(report, '활동'),
+    block('heading_3', '2️⃣ 활동 결과'),
+    bullet(`찾기 건수: ${findings}건`),
     block('bulleted_list_item', '체크리스트 내역', {
       children: questions.map((question, index) => {
-        const example = timeRanges && index === 2 ? `\n${SCORE_EXAMPLE}` : '';
-        return block('bulleted_list_item', `${question} : ${scores[index]}점${example}`);
+        const score = scores[index];
+        if (current) return bullet(`${question} · ${score}점 (${SCORE_LABELS[score - 1]})`);
+        const example = report.timeRanges && index === 2 ? `\n${SCORE_EXAMPLE}` : '';
+        return bullet(`${question} : ${score}점${example}`);
       }),
     }),
-    block('bulleted_list_item', `건의사항: ${suggestions || '없습니다.'}`),
+    bullet(`${remarksLabel}: ${remarks || '없습니다.'}`),
     ...omega3,
   ];
 }
@@ -321,9 +371,13 @@ export default async function submit(request) {
   const findings = count(input.findings);
   const organizer = input.role === 'organizer';
   const { timeRanges } = input;
+  const current = input.reportVersion === REPORT_VERSION;
 
   if (!organizer && input.role !== 'participant') {
     return reply(400, { error: '주관자 또는 활동자 양식을 선택해 주세요.' });
+  }
+  if (input.reportVersion !== undefined && !current) {
+    return reply(400, { error: '페이지를 새로고침한 뒤 양식을 다시 열어 주세요.' });
   }
   const slotIsValid = SLOTS.has(slot) && (!organizer || timeRanges === undefined || slot !== '4타임');
   if (!validDate(date) || !slotIsValid || !name || findings === null) {
@@ -335,7 +389,7 @@ export default async function submit(request) {
     if (!location || location.length > 80 || /[\r\n\u2028\u2029]/.test(location)) {
       return reply(400, { error: '활동 장소를 80자 이내의 한 줄로 입력해 주세요.' });
     }
-  } else if (input.location !== undefined && !LOCATIONS.has(location)) {
+  } else if ((current || input.location !== undefined) && !LOCATIONS.has(location)) {
     return reply(400, { error: '목록에서 활동 장소를 선택해 주세요.' });
   }
   // Earlier form versions submit the original checklist without any time fields.
@@ -351,55 +405,78 @@ export default async function submit(request) {
     return reply(503, { error: '아직 저장이 연결되지 않았어요. 운영 담당자에게 알려주세요.' });
   }
 
-  let saveReport;
+  const report = { date, slot, name, timeRanges, location };
+  const omega3 = current ? [] : omega3Details(input);
+  let prepareSave;
   if (organizer) {
     const headcount = count(input.headcount);
     if (headcount === null) return reply(400, { error: '활동 인원 수를 확인해 주세요.' });
+    const answers = ORGANIZER_QUESTIONS.map((_, index) => input[`organizerCheck${index + 1}`]);
+    if (current && answers.some(answer => answer !== 'yes' && answer !== 'no')) {
+      return reply(400, { error: '체크리스트 질문마다 예 또는 아니오를 선택해 주세요.' });
+    }
+    const checklist = current ? answers.map(answer => answer === 'yes' ? '예' : '아니오') : undefined;
+    const potionName = current ? text(input.potionName, 80) : '';
     const changes = text(input.changes, 1500);
     const notes = text(input.notes, 1500);
     const properties = {
       '주관자 이름': richText(name),
       '실제 참여 인원': { number: headcount },
       '전체 찾기 건수': { number: findings },
-      '변경·지연·누락 사유': richText(changes),
+      ...(!current && { '변경·지연·누락 사유': richText(changes) }),
       '특이사항': richText(notes),
       '주관자 제출 완료': { checkbox: true },
     };
-    const omega3 = omega3Details(input);
-    const body = organizerDetails(date, slot, timeRanges, location, name, headcount, findings, changes, notes, omega3);
-    saveReport = async sessionId => {
-      const metadata = await reportProperties(sessionsSource, '주관 시간', timeRanges, location, token);
-      await saveOrganizerReport(sessionId, { ...properties, ...metadata }, body, token);
+    const values = timeAndLocationProperties('주관 시간', timeRanges, location);
+    if (checklist) {
+      values['물약 포지션'] = richText(potionName);
+      for (const [index, [property]] of ORGANIZER_QUESTIONS.entries()) {
+        values[property] = richText(checklist[index]);
+      }
+    }
+    const body = organizerDetails(report, { headcount, findings, changes, notes, omega3, potionName, checklist });
+    prepareSave = async () => {
+      const metadata = await reportProperties(sessionsSource, values, token);
+      return sessionId => saveOrganizerReport(sessionId, { ...properties, ...metadata }, body, token);
     };
   } else {
-    const scores = SCORE_PROPERTIES.map((_, index) => count(input[`score${index + 1}`]));
-    if (scores.some(score => score === null || score < 1 || score > 5)) {
-      return reply(400, { error: '체크리스트 문장마다 1~5 중 하나를 골라 주세요.' });
+    const scoreProperties = current ? CURRENT_SCORE_PROPERTIES : SCORE_PROPERTIES;
+    const scale = current ? 3 : 5;
+    const scores = scoreProperties.map((_, index) => count(input[`score${index + 1}`]));
+    if (scores.some(score => score === null || score < 1 || score > scale)) {
+      return reply(400, { error: `체크리스트 문장마다 1~${scale} 중 하나를 골라 주세요.` });
     }
     const scoreValues = Object.fromEntries(
-      SCORE_PROPERTIES.map((property, index) => [property, { number: scores[index] }]),
+      scoreProperties.map((property, index) => [property, { number: scores[index] }]),
     );
-    const suggestions = text(input.suggestions, 1500);
-    const omega3 = omega3Details(input);
-    saveReport = async sessionId => {
-      const metadata = await reportProperties(participantsSource, '활동 시간', timeRanges, location, token);
-      await notionRequest('pages', 'POST', {
+    const remarks = text(current ? input.remarks : input.suggestions, 1500);
+    const values = {
+      ...timeAndLocationProperties('활동 시간', timeRanges, location),
+      '비고': richText(remarks),
+      ...(current && scoreValues),
+    };
+    prepareSave = async () => {
+      const metadata = await reportProperties(participantsSource, values, token);
+      if (current && CURRENT_SCORE_PROPERTIES.some(property => !Object.hasOwn(metadata, property))) {
+        throw new SessionLookupError(503, '노션 체크리스트 저장을 준비 중이에요. 잠시 후 다시 제출해 주세요.');
+      }
+      return sessionId => notionRequest('pages', 'POST', {
         parent: { type: 'data_source_id', data_source_id: participantsSource },
         properties: {
           title: { title: [{ text: { content: name } }] },
           '타임': { relation: [{ id: sessionId }] },
           '본인 찾기 건수': { number: findings },
-          '건의사항': richText(suggestions),
-          ...scoreValues,
+          ...(!current && scoreValues),
           ...metadata,
         },
-        children: participantDetails(date, slot, timeRanges, location, name, findings, scores, suggestions, omega3),
+        children: participantDetails(report, { findings, scores, remarks, omega3, current }),
       }, token);
     };
   }
 
   const key = `${date} | ${slot}`;
   try {
+    const saveReport = await prepareSave();
     const sessionId = await getOrCreateSession(key, sessionsSource, token);
     await saveReport(sessionId);
     await queueDailyAnalysis(date, sessionId).catch(() => console.error('Could not queue daily analysis'));

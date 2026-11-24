@@ -51,21 +51,56 @@
             <label>종료시간 <input type="time" data-time-end required></label>
           </div>
         </fieldset>
-        <label class="full">주관자 성명 <span class="required" aria-hidden="true">*</span><input name="name" autocomplete="name" maxlength="80" placeholder="성명을 입력해 주세요" required></label>
+        <div class="fields full">
+          <label>주관자 성명 <span class="required" aria-hidden="true">*</span><input name="name" autocomplete="name" maxlength="80" placeholder="성명을 입력해 주세요" required></label>
+          <label>물약 포지션 <span class="optional">선택</span><input name="potionName" maxlength="80" placeholder="성명을 입력해 주세요"></label>
+        </div>
       </div>
+    </fieldset>
+
+    <fieldset class="form-section">
+      <legend>주관자 체크리스트 <span class="required" aria-hidden="true">*</span></legend>
+      <p class="rating-guide">문항마다 예 또는 아니오를 골라 주세요.</p>
+      <fieldset class="rating-question">
+        <legend>1. 묵상 말씀 준비를 하였는가?</legend>
+        <div class="score-options binary-options">
+          <label><input type="radio" name="organizerCheck1" value="yes" required><span>예</span></label>
+          <label><input type="radio" name="organizerCheck1" value="no"><span>아니오</span></label>
+        </div>
+      </fieldset>
+      <fieldset class="rating-question">
+        <legend>2. 인원 목표를 확인했는가?</legend>
+        <div class="score-options binary-options">
+          <label><input type="radio" name="organizerCheck2" value="yes" required><span>예</span></label>
+          <label><input type="radio" name="organizerCheck2" value="no"><span>아니오</span></label>
+        </div>
+      </fieldset>
+      <fieldset class="rating-question">
+        <legend>3. 분위기를 살펴보며 독려하였는가?</legend>
+        <div class="score-options binary-options">
+          <label><input type="radio" name="organizerCheck3" value="yes" required><span>예</span></label>
+          <label><input type="radio" name="organizerCheck3" value="no"><span>아니오</span></label>
+        </div>
+      </fieldset>
+      <fieldset class="rating-question">
+        <legend>4. 2인 1조 짝을 잘 지었는가?</legend>
+        <div class="score-options binary-options">
+          <label><input type="radio" name="organizerCheck4" value="yes" required><span>예</span></label>
+          <label><input type="radio" name="organizerCheck4" value="no"><span>아니오</span></label>
+        </div>
+      </fieldset>
     </fieldset>
 
     <fieldset class="form-section">
       <legend>활동 결과</legend>
       <div class="fields">
-        <label>활동 인원 수 <span class="required" aria-hidden="true">*</span><input type="number" name="headcount" min="0" step="1" inputmode="numeric" placeholder="명" required></label>
-        <label>전체 찾기 건수 <span class="required" aria-hidden="true">*</span><input type="number" name="findings" min="0" step="1" inputmode="numeric" placeholder="건" required></label>
-        <label class="full">활동 변경·지연·누락 사유 <span class="optional">선택</span><textarea name="changes" rows="3" maxlength="1500" placeholder="변경되거나 지연·누락된 내용과 사유를 적어주세요."></textarea></label>
+        <label>활동자 수 <span class="required" aria-hidden="true">*</span><input type="number" name="headcount" min="0" step="1" inputmode="numeric" placeholder="명" required></label>
+        <label>찾기 건수 <span class="required" aria-hidden="true">*</span><input type="number" name="findings" min="0" step="1" inputmode="numeric" placeholder="건" required></label>
         <label class="full">특이사항 <span class="optional">선택</span><textarea name="notes" rows="3" maxlength="1500" placeholder="함께 공유할 내용이 있다면 적어주세요."></textarea></label>
       </div>
     </fieldset>
 
-    <fieldset class="form-section" aria-describedby="omega3-help">
+    <fieldset class="form-section" aria-describedby="omega3-help" hidden disabled>
       <legend>오메가-3</legend>
       <p id="omega3-help" class="checklist-guide">완료한 항목에 체크해 주세요.</p>
       <div class="checklist-options">
@@ -75,6 +110,7 @@
       </div>
     </fieldset>
 
+    <input type="hidden" name="reportVersion" value="3">
     <p class="error" id="submit-error" role="alert" hidden></p>
     <div class="actions"><button type="button" class="button secondary" data-home>처음으로</button><button class="button primary" type="submit" id="send">사후 보고 제출 <span aria-hidden="true">→</span></button></div>
   </form>
