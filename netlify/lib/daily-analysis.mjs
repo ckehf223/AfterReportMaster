@@ -20,6 +20,8 @@ const TOPICS = [
 const MARKER = 'https://havefunsam.netlify.app/#daily-ai-analysis';
 export const ORGANIZER_BODY_MARKER = 'https://havefunsam.netlify.app/#generated-organizer-report';
 const RESPONSES_MARKER = 'https://havefunsam.netlify.app/#linked-participant-reports';
+const PRODUCTION_ANALYSIS_PAGE_ID = '8de5b0d49df448308221bf88cbef18df';
+const PRODUCTION_JOURNAL_PAGE_ID = '421ad3bf99578155b45dfef59c50ab3e';
 const PENDING = 'pending/';
 const LOCK = 'worker';
 
@@ -292,29 +294,42 @@ export async function updateDailyAnalysis(date, sessionIds, env = process.env) {
       if (report) await updateOrganizerResponses(notion, report, bySession.get(session.id) ?? []);
     }
   }
-  if (!env.NOTION_DAILY_ANALYSIS_PAGE_ID) return;
-  const stats = collectDailyStats(sessions, uniqueParticipants);
-
-  const parent = env.NOTION_DAILY_ANALYSIS_PAGE_ID;
+  const parent = env.NOTION_DAILY_ANALYSIS_PAGE_ID?.trim();
+  const production = parent?.replaceAll('-', '').toLowerCase() === PRODUCTION_ANALYSIS_PAGE_ID;
+  const directJournal = env.NOTION_ACTIVITY_JOURNAL_PAGE_ID?.trim() || (production ? PRODUCTION_JOURNAL_PAGE_ID : undefined);
+  if (!parent && !directJournal) return;
   const childrenOf = pageId => childBlocks(notion, pageId);
+  let journalError;
+  const refreshJournal = async journalId => {
+    try {
+      const readOrganizerDetails = async sessionId => (await getOrganizerReport(sessionId))?.blocks ?? [];
+      const content = await formatActivityJournal(sessions, bySession, readOrganizerDetails, childrenOf);
+      await saveActivityJournal(notion, childrenOf, parent, journalId, date, content);
+    } catch (error) {
+      journalError = error;
+    }
+  };
+
+  if (directJournal) await refreshJournal(directJournal);
+  if (!parent) {
+    if (journalError) throw journalError;
+    return;
+  }
+
   const matching = [];
   const journals = [];
   for await (const block of childrenOf(parent)) {
     if (block.type !== 'child_page') continue;
     if (block.child_page.title === date) matching.push(block.id);
-    if (block.child_page.title === ACTIVITY_JOURNAL_TITLE) journals.push(block.id);
+    if (!directJournal && block.child_page.title === ACTIVITY_JOURNAL_TITLE) journals.push(block.id);
   }
-  let journalError;
-  try {
-    if (journals.length > 1) throw new Error('Multiple activity journal parent pages have the same title');
-    const readOrganizerDetails = async sessionId => (await getOrganizerReport(sessionId))?.blocks ?? [];
-    const content = await formatActivityJournal(sessions, bySession, readOrganizerDetails, childrenOf);
-    await saveActivityJournal(notion, childrenOf, parent, journals[0], date, content);
-  } catch (error) {
-    journalError = error;
+  if (!directJournal) {
+    if (journals.length > 1) journalError = new Error('Multiple activity journal parent pages have the same title');
+    else await refreshJournal(journals[0]);
   }
   if (matching.length > 1) throw new Error('Multiple daily pages have the same date');
 
+  const stats = collectDailyStats(sessions, uniqueParticipants);
   const aiEnabled = env.DAILY_AI_ENABLED === 'true';
   let aiError;
   let analysis = topicSummary(stats, aiEnabled);
