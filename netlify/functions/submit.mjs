@@ -14,6 +14,7 @@ const LOCATIONS = new Set([
 ]);
 const CLOCK_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 const REPORT_VERSION = '3';
+const ORGANIZER_PERSONAL_FINDINGS = '본인 찾기 건수';
 const reportSchemas = new Map();
 const OMEGA3_ITEMS = [
   ['omega3AfterReport', '사후'],
@@ -157,12 +158,16 @@ function reportDetails({ date, slot, timeRanges, location, name }, roleLabel) {
   ];
 }
 
-function organizerDetails(report, { headcount, findings, changes, notes, omega3, potionName, checklist }) {
+function organizerDetails(report, { headcount, findings, personalFindings, changes, notes, omega3, potionName, checklist }) {
   const details = reportDetails(report, '주관');
   // Tag only our synced block so resubmissions never replace hand-written page sections.
   details[0].heading_2.rich_text.push({
     type: 'text', text: { content: '\u2063', link: { url: ORGANIZER_BODY_MARKER } },
   });
+  const findingDetails = [bullet(`전체 찾기 건수: ${findings}건`)];
+  if (typeof personalFindings === 'number') {
+    findingDetails.push(bullet(`${ORGANIZER_PERSONAL_FINDINGS}: ${personalFindings}건`));
+  }
 
   if (checklist) {
     if (potionName) details.push(bullet(`물약 포지션: ${potionName}`));
@@ -172,7 +177,7 @@ function organizerDetails(report, { headcount, findings, changes, notes, omega3,
       ...ORGANIZER_QUESTIONS.map(([, question], index) => bullet(`${question} · ${checklist[index]}`)),
       block('heading_3', '3️⃣ 활동 결과'),
       bullet(`활동자 수: ${headcount}명`),
-      bullet(`찾기 건수: ${findings}건`),
+      ...findingDetails,
       bullet(`특이사항: ${notes || '없습니다.'}`),
       block('heading_2', '활동자 사후내역'),
       ...organizerResponses([]),
@@ -186,7 +191,7 @@ function organizerDetails(report, { headcount, findings, changes, notes, omega3,
     ...details,
     block('heading_3', '2️⃣ 활동 결과'),
     bullet(`활동 인원수: ${headcount}명`),
-    bullet(`전체 찾기 건수: ${findings}건`),
+    ...findingDetails,
     block('heading_2', '활동 변경 지연/누락 사유'),
     { type: 'divider', divider: {} },
     noteSection('활동 변경 지연/누락 사유', changes),
@@ -299,7 +304,7 @@ async function getOrCreateSession(key, source, token) {
   throw new SessionLookupError(503, '이 타임의 저장을 준비 중이에요. 잠시 후 다시 제출해 주세요.');
 }
 
-async function saveOrganizerReport(sessionId, properties, body, token) {
+async function saveOrganizerReport(sessionId, { properties, personalFindings, renderBody }, token) {
   const store = getStore({ name: 'notion-organizer-report', consistency: 'strong' });
   const entry = await store.getWithMetadata(sessionId, { type: 'json' });
   const busy = new SessionLookupError(409, '이 타임의 주관자 보고를 저장 중이에요. 잠시 후 다시 제출해 주세요.');
@@ -310,7 +315,18 @@ async function saveOrganizerReport(sessionId, properties, body, token) {
   if (!lease.modified) throw busy;
 
   try {
-    await notionRequest(`pages/${sessionId}`, 'PATCH', { properties }, token);
+    const pagePath = `pages/${sessionId}`;
+    if (personalFindings === null) {
+      const existing = await notionRequest(pagePath, 'GET', undefined, token);
+      if (typeof existing.properties?.[ORGANIZER_PERSONAL_FINDINGS]?.number === 'number') {
+        properties[ORGANIZER_PERSONAL_FINDINGS] = { number: null };
+      }
+    }
+    const updated = await notionRequest(pagePath, 'PATCH', { properties }, token);
+    const savedPersonalFindings = personalFindings === undefined
+      ? updated.properties?.[ORGANIZER_PERSONAL_FINDINGS]?.number
+      : personalFindings;
+    const body = renderBody(savedPersonalFindings);
 
     const childrenPath = `blocks/${sessionId}/children`;
     const previousReports = [];
@@ -411,6 +427,11 @@ export default async function submit(request) {
   if (organizer) {
     const headcount = count(input.headcount);
     if (headcount === null) return reply(400, { error: '활동 인원 수를 확인해 주세요.' });
+    const enteredPersonalFindings = input.personalFindings;
+    const personalFindings = enteredPersonalFindings === undefined ? undefined : count(enteredPersonalFindings);
+    if (enteredPersonalFindings !== undefined && enteredPersonalFindings !== '' && personalFindings === null) {
+      return reply(400, { error: '본인 찾기 건수는 0 이상의 정수로 입력해 주세요.' });
+    }
     const answers = ORGANIZER_QUESTIONS.map((_, index) => input[`organizerCheck${index + 1}`]);
     if (current && answers.some(answer => answer !== 'yes' && answer !== 'no')) {
       return reply(400, { error: '체크리스트 질문마다 예 또는 아니오를 선택해 주세요.' });
@@ -428,16 +449,25 @@ export default async function submit(request) {
       '주관자 제출 완료': { checkbox: true },
     };
     const values = timeAndLocationProperties('주관 시간', timeRanges, location);
+    if (typeof personalFindings === 'number') values[ORGANIZER_PERSONAL_FINDINGS] = { number: personalFindings };
     if (checklist) {
       values['물약 포지션'] = richText(potionName);
       for (const [index, [property]] of ORGANIZER_QUESTIONS.entries()) {
         values[property] = richText(checklist[index]);
       }
     }
-    const body = organizerDetails(report, { headcount, findings, changes, notes, omega3, potionName, checklist });
     prepareSave = async () => {
       const metadata = await reportProperties(sessionsSource, values, token);
-      return sessionId => saveOrganizerReport(sessionId, { ...properties, ...metadata }, body, token);
+      if (typeof personalFindings === 'number' && !Object.hasOwn(metadata, ORGANIZER_PERSONAL_FINDINGS)) {
+        throw new SessionLookupError(503, '노션의 본인 찾기 건수 저장을 준비 중이에요. 잠시 후 다시 제출해 주세요.');
+      }
+      return sessionId => saveOrganizerReport(sessionId, {
+        properties: { ...properties, ...metadata },
+        personalFindings,
+        renderBody: savedCount => organizerDetails(report, {
+          headcount, findings, personalFindings: savedCount, changes, notes, omega3, potionName, checklist,
+        }),
+      }, token);
     };
   } else {
     const scoreProperties = current ? CURRENT_SCORE_PROPERTIES : SCORE_PROPERTIES;
